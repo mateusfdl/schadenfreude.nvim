@@ -6,13 +6,23 @@ M.llm_options = {
 	gpt = {
 		url = "https://api.openai.com/v1/chat/completions",
 		model = "gpt-4o-mini",
-		system_message_context = "You should replace the code that you are sent, in case is sent code, only following the comments. Do not talk at all. Only output valid code. Do not provide any backticks that surround the code. Never ever output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them. Do not output backticks, any questions asked that is not code related shall be answered straight to the topic, once more, no provide any backticks or nothing that can break the experience",
+		system_message_context = [[
+            You should replace the code that you are sent, in case it is code, only following the comments.
+            Do not talk at all. Only output valid code. Do not provide any backticks that surround the code.
+            Never output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them.
+            Do not output backticks. Any non-code-related questions shall be answered straight to the topic.
+        ]],
 		api_key = "",
 	},
 	groq = {
 		url = "https://api.groq.com/openai/v1/chat/completions",
 		model = "llama-3.3-70b-versatile",
-		system_message_context = "in case is sent code, you should replace the code, only following the comments. Do not talk at all. Only output valid code. Do not provide any backticks that surround the code. Never ever output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them. Do not output backticks, any questions asked that is not code related shall be answered",
+		system_message_context = [[
+            In case it is code, you should replace the code only following the comments.
+            Do not talk at all. Only output valid code. Do not provide any backticks that surround the code.
+            Never output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them.
+            Do not output backticks. Any non-code-related questions shall be answered.
+        ]],
 		api_key = "",
 	},
 }
