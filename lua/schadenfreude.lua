@@ -1,16 +1,35 @@
+require("utils")
+
 local M = {}
 local Job = require("plenary.job")
+local float_buf_message_history = {}
 local active_job_state = nil
+local active_buffer_id = nil
+
+local chat_buffer_context = [[
+This session will focus exclusively on topics related to programming, computer science, and engineering.
+Provide accurate, concise, and contextually relevant answers.
+Avoid unnecessary explanations unless explicitly requested.
+The chat supports markdown so use backticks for code snippets surrounding them with ``` and the language.
+Prioritize solutions that are simple, efficient, and align with best practices.
+Validate code or technical solutions before providing them.
+If asked for examples or demonstrations, provide complete and working snippets.
+For any ambiguities, clarify with concise follow-up questions.
+Avoid casual conversation or off-topic discussions; strictly adhere to the domain focus.
+DO NOT TALK AT ALL IF IS NOT ASKED TO
+]]
 
 M.llm_options = {
 	gpt = {
 		url = "https://api.openai.com/v1/chat/completions",
 		model = "gpt-4o-mini",
 		system_message_context = [[
-            You should replace the code that you are sent, in case it is code, only following the comments.
+            You shall replace the code that you are sent, only following the comments.
             Do not talk at all. Only output valid code. Do not provide any backticks that surround the code.
             Never output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them.
-            Do not output backticks. Any non-code-related questions shall be answered straight to the topic.
+            Do not output backticks. 
+            Prefer concise and straightforward solutions and always valid code.
+            Invalid code is not torelerated and will be you be your responsibility to not provide any invalid code at all.
         ]],
 		api_key = "",
 	},
@@ -18,10 +37,12 @@ M.llm_options = {
 		url = "https://api.groq.com/openai/v1/chat/completions",
 		model = "llama-3.3-70b-versatile",
 		system_message_context = [[
-            In case it is code, you should replace the code only following the comments.
+            You shall replace the code that you are sent, only following the comments.
             Do not talk at all. Only output valid code. Do not provide any backticks that surround the code.
             Never output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them.
-            Do not output backticks. Any non-code-related questions shall be answered.
+            Do not output backticks. 
+            Prefer concise and straightforward solutions and always valid code.
+            Invalid code is not torelerated and will be you be your responsibility to not provide any invalid code at all.
         ]],
 		api_key = "",
 	},
@@ -39,85 +60,22 @@ local function setup_groq_options(opt)
 	end
 end
 
-function M.get_lines_until_cursor()
-	local current_buffer = vim.api.nvim_get_current_buf()
-	local current_window = vim.api.nvim_get_current_win()
-	local cursor_position = vim.api.nvim_win_get_cursor(current_window)
-	local row = cursor_position[1]
-
-	local lines = vim.api.nvim_buf_get_lines(current_buffer, 0, row, true)
-
-	return table.concat(lines, "\n")
-end
-
-function M.get_visual_selection()
-	local _, srow, scol = unpack(vim.fn.getpos("v"))
-	local _, erow, ecol = unpack(vim.fn.getpos("."))
-
-	if vim.fn.mode() == "V" then
-		if srow > erow then
-			return vim.api.nvim_buf_get_lines(0, erow - 1, srow, true)
-		else
-			return vim.api.nvim_buf_get_lines(0, srow - 1, erow, true)
-		end
-	end
-
-	if vim.fn.mode() == "v" then
-		if srow < erow or (srow == erow and scol <= ecol) then
-			return vim.api.nvim_buf_get_text(0, srow - 1, scol - 1, erow - 1, ecol, {})
-		else
-			return vim.api.nvim_buf_get_text(0, erow - 1, ecol - 1, srow - 1, scol, {})
-		end
-	end
-
-	if vim.fn.mode() == "\22" then
-		local lines = {}
-		if srow > erow then
-			srow, erow = erow, srow
-		end
-		if scol > ecol then
-			scol, ecol = ecol, scol
-		end
-		for i = srow, erow do
-			table.insert(
-				lines,
-				vim.api.nvim_buf_get_text(0, i - 1, math.min(scol - 1, ecol), i - 1, math.max(scol - 1, ecol), {})[1]
-			)
-		end
-		return lines
-	end
-end
-
-local function get_prompt(opts)
-	local replace = opts.replace
-	local visual_lines = M.get_visual_selection()
-	local prompt = ""
-
-	if visual_lines then
-		prompt = table.concat(visual_lines, "\n")
-		if replace then
-			vim.api.nvim_command("normal! d")
-			vim.api.nvim_command("normal! k")
-		else
-			vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", false, true, true), "nx", false)
-		end
-	else
-		prompt = M.get_lines_until_cursor()
-	end
-
-	return prompt
-end
-
-local function openai_help(opt, prompt)
+local function openai_help(opt, prompt, is_chating_window)
 	local url = opt.url
 	local api_key = opt.api_key
+	local messages = { { role = "system", content = opt.system_message_context } }
+
+	if is_chating_window then
+		messages = { { role = "system", content = chat_buffer_context } }
+		if #float_buf_message_history > 0 then
+			vim.list_extend(messages, float_buf_message_history)
+		end
+	end
+	table.insert(messages, { role = "user", content = prompt })
 
 	local payload = {
 		model = opt.model,
-		messages = {
-			{ role = "system", content = opt.system_message_context },
-			{ role = "user", content = prompt },
-		},
+		messages = messages,
 		max_tokens = 2048,
 		temperature = 0.7,
 		stream = true,
@@ -135,9 +93,12 @@ local function openai_help(opt, prompt)
 end
 
 local function open_floating_buffer()
-	local buf = vim.api.nvim_create_buf(false, true)
-	if not buf then
-		return nil
+	if active_buffer_id == nil then
+		local buf = vim.api.nvim_create_buf(false, true)
+		if not buf then
+			return nil
+		end
+		active_buffer_id = buf
 	end
 
 	local width = vim.api.nvim_get_option("columns")
@@ -159,9 +120,23 @@ local function open_floating_buffer()
 		border = { "-", "-", "-", "|", "-", "-", "-", "|" },
 	}
 
-	vim.api.nvim_open_win(buf, true, opts)
+	vim.api.nvim_open_win(active_buffer_id, true, opts)
+	vim.api.nvim_buf_set_option(active_buffer_id, "filetype", "markdown")
+	vim.api.nvim_command("au! * <buffer>")
 
-	return buf
+	return active_buffer_id
+end
+
+function M.wipe_floating_chat_buffer()
+	float_buf_message_history = {}
+end
+
+local function open_ai_push_assistant_message(message)
+	table.insert(float_buf_message_history, { role = "assistant", content = message })
+end
+
+local function open_ai_push_user_message(message)
+	table.insert(float_buf_message_history, { role = "user", content = message .. "\n" })
 end
 
 local function make_call(args, data_handler)
@@ -182,12 +157,7 @@ local function make_call(args, data_handler)
 	return job
 end
 
-
-M.get_text_visual_selection = function(replace)
-	return get_prompt({ replace = replace })
-end
-
-M.setup = function(opt)
+function M.setup(opt)
 	for k, v in pairs(opt) do
 		if k == "gpt" then
 			setup_gpt_options(v)
@@ -200,20 +170,24 @@ M.setup = function(opt)
 end
 
 function M.openai_write_answer_to_buffer(opt)
-	local prompt = M.get_text_visual_selection(opt.replace or false)
+	local prompt = get_prompt(opt.replace or false)
 
-  if not opt.vendor then
-    print("Please provide a vendor")
-  end
+	if not opt.vendor then
+		print("Please provide a vendor")
+	end
 
-	local args = openai_help(M.llm_options[opt.vendor], prompt)
-
-	if opt.floating_window then
+	if opt.floating_window and vim.api.nvim_get_current_buf() ~= active_buffer_id then
 		open_floating_buffer()
 	end
 
 	if active_job_state then
 		active_job_state:stop()
+	end
+	local args = openai_help(M.llm_options[opt.vendor], prompt, opt.floating_window)
+
+	stream_string_to_current_window("\n\n" .. prompt .. "\n\n")
+	if opt.floating_window then
+		open_ai_push_user_message(prompt)
 	end
 
 	active_job_state = make_call(args, function(data)
@@ -221,29 +195,13 @@ function M.openai_write_answer_to_buffer(opt)
 		local success, response = pcall(vim.json.decode, filtered_data)
 		if success then
 			if response.choices and response.choices[1] then
-				M.stream_string_to_current_window(response.choices[1].delta.content)
+				local content = response.choices[1].delta.content
+				stream_string_to_current_window(content)
+				if opt.floating_window then
+					open_ai_push_assistant_message(content)
+				end
 			end
 		end
-	end)
-end
-
-function M.stream_string_to_current_window(str)
-	vim.schedule(function()
-		local current_window = vim.api.nvim_get_current_win()
-		local cursor_position = vim.api.nvim_win_get_cursor(current_window)
-		local row, col = cursor_position[1], cursor_position[2]
-
-		if not str then
-			return
-		end
-		local lines = vim.split(str, "\n")
-
-		vim.cmd("undojoin")
-		vim.api.nvim_put(lines, "c", true, true)
-
-		local num_lines = #lines
-		local last_line_length = #lines[num_lines]
-		vim.api.nvim_win_set_cursor(current_window, { row + num_lines - 1, col + last_line_length })
 	end)
 end
 
