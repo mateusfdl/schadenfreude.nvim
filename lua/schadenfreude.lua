@@ -1,7 +1,8 @@
 require("utils")
+local Chat = require("chat")
+local Job = require("plenary.job")
 
 local M = {}
-local Job = require("plenary.job")
 local float_buf_message_history = {}
 local active_job_state = nil
 local active_buffer_id = nil
@@ -92,45 +93,6 @@ local function openai_help(opt, prompt, is_chating_window)
 	return args
 end
 
-local function open_floating_buffer()
-	if active_buffer_id == nil then
-		local buf = vim.api.nvim_create_buf(false, true)
-		if not buf then
-			return nil
-		end
-		active_buffer_id = buf
-	end
-
-	local width = vim.api.nvim_get_option("columns")
-	local height = vim.api.nvim_get_option("lines")
-
-	local win_width = math.ceil(width * 0.7)
-	local win_height = math.ceil(height * 0.7)
-
-	local col = math.ceil((width - win_width) / 2)
-	local row = math.ceil((height - win_height) / 2)
-
-	local opts = {
-		style = "minimal",
-		relative = "editor",
-		width = win_width,
-		height = win_height,
-		row = row,
-		col = col,
-		border = { "-", "-", "-", "|", "-", "-", "-", "|" },
-	}
-
-	vim.api.nvim_open_win(active_buffer_id, true, opts)
-	vim.api.nvim_buf_set_option(active_buffer_id, "filetype", "markdown")
-	vim.api.nvim_command("au! * <buffer>")
-
-	return active_buffer_id
-end
-
-function M.wipe_floating_chat_buffer()
-	float_buf_message_history = {}
-end
-
 local function open_ai_push_assistant_message(message)
 	table.insert(float_buf_message_history, { role = "assistant", content = message })
 end
@@ -169,6 +131,10 @@ function M.setup(opt)
 	end
 end
 
+function M.AttachChatToWin()
+	Chat.start(vim.api.nvim_get_current_win())
+end
+
 function M.openai_write_answer_to_buffer(opt)
 	local prompt = get_prompt(opt.replace or false)
 
@@ -176,19 +142,24 @@ function M.openai_write_answer_to_buffer(opt)
 		print("Please provide a vendor")
 	end
 
-	if opt.floating_window and vim.api.nvim_get_current_buf() ~= active_buffer_id then
-		open_floating_buffer()
+	if opt.chat and vim.api.nvim_get_current_buf() ~= active_buffer_id then
+		if opt.floating_window then
+			active_buffer_id = Chat.start(nil)
+		else
+			active_buffer_id = Chat.start(vim.api.nvim_get_current_win())
+		end
 	end
 
 	if active_job_state then
 		active_job_state:stop()
 	end
-	local args = openai_help(M.llm_options[opt.vendor], prompt, opt.floating_window)
+	local args = openai_help(M.llm_options[opt.vendor], prompt, opt.chat)
 
-	stream_string_to_current_window("\n\n" .. prompt .. "\n\n")
-	if opt.floating_window then
+	if opt.chat then
 		open_ai_push_user_message(prompt)
 	end
+
+	stream_string_to_current_window("\n\n")
 
 	active_job_state = make_call(args, function(data)
 		local filtered_data = data:match("^data: (.+)$")
@@ -197,9 +168,13 @@ function M.openai_write_answer_to_buffer(opt)
 			if response.choices and response.choices[1] then
 				local content = response.choices[1].delta.content
 				stream_string_to_current_window(content)
-				if opt.floating_window then
+				if opt.chat then
 					open_ai_push_assistant_message(content)
 				end
+			end
+
+			if response.choices[1].finish_reason == "stop" then
+				stream_string_to_current_window("\n\n")
 			end
 		end
 	end)

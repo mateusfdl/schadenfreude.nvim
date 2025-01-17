@@ -10,38 +10,34 @@ function get_lines_until_cursor()
 end
 
 function get_visual_selection()
-	local _, srow, scol = unpack(vim.fn.getpos("v"))
-	local _, erow, ecol = unpack(vim.fn.getpos("."))
+	local srow, scol = unpack(vim.fn.getpos("v"), 2, 3)
+	local erow, ecol = unpack(vim.fn.getpos("."), 2, 3)
+	local mode = vim.fn.visualmode()
 
-	if vim.fn.mode() == "V" then
-		if srow > erow then
-			return vim.api.nvim_buf_get_lines(0, erow - 1, srow, true)
-		else
-			return vim.api.nvim_buf_get_lines(0, srow - 1, erow, true)
-		end
+	if srow > erow then
+		srow, erow = erow, srow
 	end
 
-	if vim.fn.mode() == "v" then
-		if srow < erow or (srow == erow and scol <= ecol) then
-			return vim.api.nvim_buf_get_text(0, srow - 1, scol - 1, erow - 1, ecol, {})
-		else
-			return vim.api.nvim_buf_get_text(0, erow - 1, ecol - 1, srow - 1, scol, {})
-		end
+	if mode == "V" then
+		local svrow = unpack(vim.fn.getpos("'<"), 2)
+		local evrow = unpack(vim.fn.getpos("'>"), 2)
+
+		return vim.api.nvim_buf_get_lines(0, svrow - 1, evrow, true)
 	end
 
-	if vim.fn.mode() == "\22" then
+	if mode == "v" then
+		local lines = vim.api.nvim_buf_get_lines(0, srow - 1, erow, true)
+		lines[1] = string.sub(lines[1], scol)
+		lines[#lines] = string.sub(lines[#lines], 1, ecol)
+		return lines
+	end
+
+	if mode == "\22" then
 		local lines = {}
-		if srow > erow then
-			srow, erow = erow, srow
-		end
-		if scol > ecol then
-			scol, ecol = ecol, scol
-		end
-		for i = srow, erow do
-			table.insert(
-				lines,
-				vim.api.nvim_buf_get_text(0, i - 1, math.min(scol - 1, ecol), i - 1, math.max(scol - 1, ecol), {})[1]
-			)
+		for i = srow - 1, erow - 1 do
+			local text =
+				vim.api.nvim_buf_get_text(0, i, math.min(scol - 1, ecol - 1), i, math.max(scol - 1, ecol - 1) + 1, {})
+			table.insert(lines, text[1])
 		end
 		return lines
 	end
