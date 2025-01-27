@@ -3,7 +3,8 @@ local Chat = require("chat")
 local Job = require("plenary.job")
 
 local M = {}
-local float_buf_message_history = {}
+
+M.float_buf_message_history = {}
 local active_job_state = nil
 local active_buffer_id = nil
 
@@ -68,9 +69,6 @@ local function openai_help(opt, prompt, is_chating_window)
 
 	if is_chating_window then
 		messages = { { role = "system", content = chat_buffer_context } }
-		if #float_buf_message_history > 0 then
-			vim.list_extend(messages, float_buf_message_history)
-		end
 	end
 	table.insert(messages, { role = "user", content = prompt })
 
@@ -91,14 +89,6 @@ local function openai_help(opt, prompt, is_chating_window)
 	table.insert(args, url)
 
 	return args
-end
-
-local function open_ai_push_assistant_message(message)
-	table.insert(float_buf_message_history, { role = "assistant", content = message })
-end
-
-local function open_ai_push_user_message(message)
-	table.insert(float_buf_message_history, { role = "user", content = message .. "\n" })
 end
 
 local function make_call(args, data_handler)
@@ -132,10 +122,14 @@ function M.setup(opt)
 end
 
 function M.AttachChatToWin()
-	Chat.start(vim.api.nvim_get_current_win())
+	active_buffer_id = Chat.start(vim.api.nvim_get_current_win())
 end
 
 function M.openai_write_answer_to_buffer(opt)
+	if opt.chat then
+		opt.replace = true
+	end
+
 	local prompt = get_prompt(opt.replace or false)
 
 	if not opt.vendor then
@@ -143,10 +137,8 @@ function M.openai_write_answer_to_buffer(opt)
 	end
 
 	if opt.chat and vim.api.nvim_get_current_buf() ~= active_buffer_id then
-		if opt.floating_window then
-			active_buffer_id = Chat.start(nil)
-		else
-			active_buffer_id = Chat.start(vim.api.nvim_get_current_win())
+		if active_buffer_id then
+			vim.api.nvim_set_current_buf(active_buffer_id)
 		end
 	end
 
@@ -154,10 +146,6 @@ function M.openai_write_answer_to_buffer(opt)
 		active_job_state:stop()
 	end
 	local args = openai_help(M.llm_options[opt.vendor], prompt, opt.chat)
-
-	if opt.chat then
-		open_ai_push_user_message(prompt)
-	end
 
 	stream_string_to_current_window("\n\n")
 
@@ -168,9 +156,6 @@ function M.openai_write_answer_to_buffer(opt)
 			if response.choices and response.choices[1] then
 				local content = response.choices[1].delta.content
 				stream_string_to_current_window(content)
-				if opt.chat then
-					open_ai_push_assistant_message(content)
-				end
 			end
 
 			if response.choices[1].finish_reason == "stop" then
