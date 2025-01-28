@@ -6,38 +6,47 @@ local function lookup_for_chat_buffer()
 	return vim.fn.bufnr("Chat")
 end
 
+local function find_window_for_buffer(bufnr)
+	for _, win in ipairs(vim.api.nvim_list_wins()) do
+		if vim.api.nvim_win_get_buf(win) == bufnr then
+			return win
+		end
+	end
+	return nil
+end
+
 local function create_attached_buffer(window_id)
-	local buf = vim.api.nvim_create_buf(true, true)
+	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_win_set_buf(window_id, buf)
 	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
 	vim.api.nvim_buf_set_name(buf, "Chat")
-	vim.api.nvim_command("au! * <buffer>")
 
-	vim.diagnostic.disable(buf)
+	if vim.diagnostic and vim.diagnostic.disable then
+		vim.diagnostic.disable(buf)
+	end
 
 	return buf
 end
 
-function M.start(window_id_to_attach)
-	local existing_chat_buffer = lookup_for_chat_buffer()
-	if existing_chat_buffer ~= -1 then
-		if window_id_to_attach then
-			local _, ok = pcall(vim.api.nvim_win_set_buf, chat_window_id, existing_chat_buffer)
-			if ok then
-				return existing_chat_buffer
-			end
-		end
+function M.start()
+	local chat_bufnr = lookup_for_chat_buffer()
 
+	if chat_bufnr == -1 then
 		chat_window_id = vim.api.nvim_get_current_win()
-
-		vim.api.nvim_win_set_buf(chat_window_id, lookup_for_chat_buffer())
-
-		return existing_chat_buffer
+		return create_attached_buffer(chat_window_id)
+	else
+		local existing_win = find_window_for_buffer(chat_bufnr)
+		if existing_win then
+			vim.api.nvim_set_current_win(existing_win)
+			chat_window_id = existing_win
+			return chat_bufnr
+		else
+			local current_win = vim.api.nvim_get_current_win()
+			vim.api.nvim_win_set_buf(current_win, chat_bufnr)
+			chat_window_id = current_win
+			return chat_bufnr
+		end
 	end
-
-	chat_window_id = window_id_to_attach
-
-	return create_attached_buffer(window_id_to_attach)
 end
 
 return M
