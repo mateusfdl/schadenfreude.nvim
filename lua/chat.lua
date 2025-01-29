@@ -49,4 +49,20 @@ function M.start()
 	end
 end
 
+function M.focus_or_create_chat()
+	local chat_bufnr = lookup_for_chat_buffer()
+
+	if chat_bufnr == -1 then
+		return M.start()
+	else
+		local chat_win = find_window_for_buffer(chat_bufnr)
+		if chat_win then
+			vim.api.nvim_set_current_win(chat_win)
+		else
+			vim.api.nvim_set_current_buf(chat_bufnr)
+		end
+		return chat_bufnr
+	end
+end
+
 return M
