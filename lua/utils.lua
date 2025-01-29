@@ -1,4 +1,4 @@
-local api = api
+local api = vim.api
 local fn = vim.fn
 local cmd = vim.cmd
 local feedkeys = api.nvim_feedkeys
