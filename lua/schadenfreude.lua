@@ -1,6 +1,6 @@
-require("utils")
-local Chat = require("chat")
 local Job = require("plenary.job")
+local Chat = require("chat")
+require("utils")
 
 local M = {}
 
@@ -18,7 +18,7 @@ Validate code or technical solutions before providing them.
 If asked for examples or demonstrations, provide complete and working snippets.
 For any ambiguities, clarify with concise follow-up questions.
 Avoid casual conversation or off-topic discussions; strictly adhere to the domain focus.
-DO NOT TALK AT ALL IF IS NOT ASKED TO
+Avoid providing thinking process or <think> tags
 ]]
 
 M.llm_options = {
@@ -31,20 +31,20 @@ M.llm_options = {
             Never output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them.
             Do not output backticks. 
             Prefer concise and straightforward solutions and always valid code.
-            Invalid code is not torelerated and will be you be your responsibility to not provide any invalid code at all.
+            Invalid code is not tolerated and will be your responsibility to not provide any invalid code at all.
         ]],
 		api_key = "",
 	},
 	groq = {
 		url = "https://api.groq.com/openai/v1/chat/completions",
-		model = "llama-3.3-70b-versatile",
+		model = "deepseek-r1-distill-llama-70b",
 		system_message_context = [[
             You shall replace the code that you are sent, only following the comments.
             Do not talk at all. Only output valid code. Do not provide any backticks that surround the code.
             Never output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them.
             Do not output backticks. 
             Prefer concise and straightforward solutions and always valid code.
-            Invalid code is not torelerated and will be you be your responsibility to not provide any invalid code at all.
+            Invalid code is not tolerated and will be your responsibility to not provide any invalid code at all.
         ]],
 		api_key = "",
 	},
@@ -62,12 +62,12 @@ local function setup_groq_options(opt)
 	end
 end
 
-local function openai_help(opt, prompt, is_chating_window)
+local function openai_help(opt, prompt, is_chat_window)
 	local url = opt.url
 	local api_key = opt.api_key
 	local messages = { { role = "system", content = opt.system_message_context } }
 
-	if is_chating_window then
+	if is_chat_window then
 		messages = { { role = "system", content = chat_buffer_context } }
 	end
 	table.insert(messages, { role = "user", content = prompt })
@@ -76,7 +76,9 @@ local function openai_help(opt, prompt, is_chating_window)
 		model = opt.model,
 		messages = messages,
 		max_tokens = 2048,
-		temperature = 0.7,
+		temperature = 0.6,
+		max_completion_tokens = 4096,
+		top_p = 0.95,
 		stream = true,
 	}
 
@@ -122,7 +124,7 @@ function M.setup(opt)
 end
 
 function M.AttachChatToWin()
-	active_buffer_id = Chat.start(vim.api.nvim_get_current_win())
+	active_buffer_id = Chat.start()
 end
 
 function M.openai_write_answer_to_buffer(opt)
@@ -137,9 +139,8 @@ function M.openai_write_answer_to_buffer(opt)
 	end
 
 	if opt.chat and vim.api.nvim_get_current_buf() ~= active_buffer_id then
-		if active_buffer_id then
-			vim.api.nvim_set_current_buf(active_buffer_id)
-		end
+		active_buffer_id = Chat.focus_or_create_chat()
+		stream_string_to_chat_buffer(prompt)
 	end
 
 	if active_job_state then
@@ -147,7 +148,7 @@ function M.openai_write_answer_to_buffer(opt)
 	end
 	local args = openai_help(M.llm_options[opt.vendor], prompt, opt.chat)
 
-	stream_string_to_current_window("\n\n")
+	stream_string_to_chat_buffer("\n\n")
 
 	active_job_state = make_call(args, function(data)
 		local filtered_data = data:match("^data: (.+)$")
@@ -155,11 +156,11 @@ function M.openai_write_answer_to_buffer(opt)
 		if success then
 			if response.choices and response.choices[1] then
 				local content = response.choices[1].delta.content
-				stream_string_to_current_window(content)
+				stream_string_to_chat_buffer(content)
 			end
 
 			if response.choices[1].finish_reason == "stop" then
-				stream_string_to_current_window("\n\n")
+				stream_string_to_chat_buffer("\n\n")
 			end
 		end
 	end)
