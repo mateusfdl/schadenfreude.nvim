@@ -12,7 +12,6 @@ local chat_buffer_context = [[
 This session will focus exclusively on topics related to programming, computer science, and engineering.
 Provide accurate, concise, and contextually relevant answers.
 Avoid unnecessary explanations unless explicitly requested.
-The chat supports markdown so use backticks for code snippets surrounding them with ``` and the language.
 Prioritize solutions that are simple, efficient, and align with best practices.
 Validate code or technical solutions before providing them.
 If asked for examples or demonstrations, provide complete and working snippets.
@@ -123,11 +122,11 @@ function M.setup(opt)
 	end
 end
 
-function M.AttachChatToWin()
+function M.open_chat()
 	active_buffer_id = Chat.start()
 end
 
-function M.openai_write_answer_to_buffer(opt)
+function M.send_message(opt)
 	if opt.chat then
 		opt.replace = true
 	end
@@ -146,6 +145,8 @@ function M.openai_write_answer_to_buffer(opt)
 	if active_job_state then
 		active_job_state:stop()
 	end
+
+	prompt = prepend_file_contents(prompt)
 	local args = openai_help(M.llm_options[opt.vendor], prompt, opt.chat)
 
 	stream_string_to_chat_buffer("\n\n")

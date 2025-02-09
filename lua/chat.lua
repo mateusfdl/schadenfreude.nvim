@@ -15,7 +15,7 @@ local function find_window_for_buffer(bufnr)
 	return nil
 end
 
-local function create_attached_buffer(window_id)
+local function create_and_attach_buffer(window_id)
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_win_set_buf(window_id, buf)
 	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
@@ -33,7 +33,7 @@ function M.start()
 
 	if chat_bufnr == -1 then
 		chat_window_id = vim.api.nvim_get_current_win()
-		return create_attached_buffer(chat_window_id)
+		return create_and_attach_buffer(chat_window_id)
 	else
 		local existing_win = find_window_for_buffer(chat_bufnr)
 		if existing_win then

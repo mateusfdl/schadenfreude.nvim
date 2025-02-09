@@ -116,3 +116,49 @@ function handle_chat_or_buffer(str)
 		stream_string_to_chat_buffer(str)
 	end
 end
+
+--- @param str string|nil # The file path to read from.
+--- @return string # The file content or an error message if the file could not be opened.
+function read_file_content(filepath)
+	local cwd = vim.fn.getcwd()
+	local full_path
+
+	if filepath:sub(1, 1) == "/" then
+		full_path = filepath
+	elseif filepath:sub(1, 2) == "~/" then
+		full_path = os.getenv("HOME") .. filepath:sub(2)
+	elseif filepath:sub(1, 2) == "./" then
+		full_path = cwd .. filepath:sub(2)
+	else
+		full_path = cwd .. "/" .. filepath
+	end
+	local f = io.open(full_path, "r")
+	if not f then
+		return ("[Error: Could not open file '%s']"):format(filepath)
+	end
+
+	local content = f:read("*all")
+	f:close()
+	return content
+end
+
+--- @param str string|nil # The filepath to extract the extension from.
+function get_file_extension(filepath)
+	return filepath:match("%.([^%.]+)$") or ""
+end
+
+function prepend_file_contents(prompt)
+	local file_snippets = {}
+	local cleaned_prompt = prompt:gsub("!([^%s]+)", function(file_path)
+		local content = read_file_content(file_path)
+		local ext = get_file_extension(file_path) or ""
+		if ext ~= "" then
+			table.insert(file_snippets, string.format("```%s\n%s\n```\n\n", ext, content))
+		else
+			table.insert(file_snippets, string.format("```\n%s\n```\n\n", content))
+		end
+		return ""
+	end)
+
+	return table.concat(file_snippets, "") .. cleaned_prompt
+end
