@@ -5,10 +5,18 @@ local feedkeys = api.nvim_feedkeys
 local termcodes = api.nvim_replace_termcodes
 
 function get_lines_until_cursor()
-	local buf = api.nvim_get_current_buf()
-	local win = api.nvim_get_current_win()
-	local row = api.nvim_win_get_cursor(win)[1]
-	return table.concat(api.nvim_buf_get_lines(buf, 0, row, true), "\n")
+	local cursor = vim.api.nvim_win_get_cursor(0)
+	local row = cursor[1] - 1
+	local col = cursor[2]
+
+	local lines = vim.api.nvim_buf_get_lines(0, 0, row, false)
+
+	if #lines > 0 then
+		local last_line = lines[#lines]
+		lines[#lines] = string.sub(last_line, 1, col)
+	end
+
+	return table.concat(lines, "\n")
 end
 
 function get_visual_selection()
