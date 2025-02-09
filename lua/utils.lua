@@ -19,34 +19,42 @@ function get_lines_until_cursor()
 	return table.concat(lines, "\n")
 end
 
-function get_visual_selection()
-	local mode = fn.visualmode()
-	local srow, scol = unpack(fn.getpos("v"), 2, 3)
-	local erow, ecol = unpack(fn.getpos("."), 2, 3)
+function M.get_visual_selection()
+	local start_pos = vim.fn.getpos("'<")
+	local end_pos = vim.fn.getpos("'>")
 
-	if srow > erow then
-		srow, erow = erow, srow
+	local start_line = start_pos[2]
+	local start_col = start_pos[3]
+	local end_line = end_pos[2]
+	local end_col = end_pos[3]
+
+	if start_line == 0 or end_line == 0 or start_line > end_line then
+		return ""
 	end
 
-	if mode == "V" then
-		cmd("normal! gv_d")
-		return api.nvim_buf_get_lines(0, srow - 1, erow, true)
-	elseif mode == "v" then
-		local lines = api.nvim_buf_get_lines(0, srow - 1, erow, true)
-		lines[1] = lines[1]:sub(scol)
-		lines[#lines] = lines[#lines]:sub(1, ecol)
-		cmd("normal! gv\nd")
-		return lines
-	elseif mode == "\22" then
-		local lines = {}
-		for i = srow - 1, erow - 1 do
-			local text =
-				api.nvim_buf_get_text(0, i, math.min(scol - 1, ecol - 1), i, math.max(scol - 1, ecol - 1) + 1, {})
-			table.insert(lines, text[1])
-		end
-		cmd("normal! gv\nd")
-		return lines
+	local lines = vim.api.nvim_buf_get_lines(0, start_line - 1, end_line, false)
+	if #lines == 0 then
+		return ""
 	end
+
+	if #lines == 1 then
+		return string.sub(lines[1], start_col, end_col)
+	end
+
+	local first_line = string.sub(lines[1], start_col, -1)
+	local last_line = string.sub(lines[#lines], 1, end_col)
+	local middle = {}
+
+	for i = 2, (#lines - 1) do
+		table.insert(middle, lines[i])
+	end
+
+	local selection = {}
+	table.insert(selection, first_line)
+	vim.list_extend(selection, middle)
+	table.insert(selection, last_line)
+
+	return table.concat(selection, "\n")
 end
 
 function get_prompt(replace)
