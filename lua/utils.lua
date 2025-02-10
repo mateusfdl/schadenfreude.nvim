@@ -142,11 +142,14 @@ function read_file_content(filepath)
 	return content
 end
 
---- @param str string|nil # The filepath to extract the extension from.
+--- @param filepath string|nil # The filepath to extract the extension from.
+--- @return string # The file extension or an empty string if no extension is found.
 function get_file_extension(filepath)
 	return filepath:match("%.([^%.]+)$") or ""
 end
 
+--- @param prompt string # The prompt text to prepend with file contents.
+--- @return string # The prompt text with file contents prepended.
 function prepend_file_contents(prompt)
 	local file_snippets = {}
 	local cleaned_prompt = prompt:gsub("!([^%s]+)", function(file_path)

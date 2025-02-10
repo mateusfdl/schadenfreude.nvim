@@ -18,11 +18,11 @@ end
 local function create_and_attach_buffer(window_id)
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_win_set_buf(window_id, buf)
-	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
+	vim.api.nvim_buf_set_var(buf, "filetype", "markdown")
 	vim.api.nvim_buf_set_name(buf, "Chat")
 
-	if vim.diagnostic and vim.diagnostic.disable then
-		vim.diagnostic.disable(buf)
+	if vim.diagnostic and vim.diagnostic.enable() then
+		vim.diagnostic.enable(false, { bufnr = buf })
 	end
 
 	return buf
