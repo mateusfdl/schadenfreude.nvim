@@ -15,16 +15,18 @@ function M.setup(configs)
 	end
 
 	for _, config in pairs(configs) do
-		if not config.provider or not config.api_key then
-			error("Provider and API key are required for each config")
-		end
+		if type(config) == "table" then
+			if not config.provider or not config.api_key then
+				error("Provider and API key are required for each config")
+			end
 
-		if not config.interface then
-			error("Interface is required for each config, please specify either 'openai' or 'anthropic'")
-		end
+			if not config.interface then
+				error("Interface is required for each config, please specify either 'openai' or 'anthropic'")
+			end
 
-		local llm = LLM:new(config.interface, config.provider, config.api_key, config.options)
-		table.insert(llms, { name = config.provider, llm = llm })
+			local llm = LLM:new(config.interface, config.provider, config.api_key, config.options)
+			table.insert(llms, { name = config.provider, llm = llm })
+		end
 	end
 
 	if #llms > 0 and configs.selected_provider then
