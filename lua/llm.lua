@@ -9,38 +9,31 @@ local DEFAULT_CONTEXT = [[You're a programming assistant focused on providing cl
 - Point out potential issues or gotchas
 - Ask for clarification if requirements are unclear]]
 
-local PROVIDERS = {
+local INTERFACES = {
 	anthropic = {
-		url = "https://api.anthropic.com/v1/messages",
-		model = "claude-3-sonnet-20240229",
 		system_message_context = DEFAULT_CONTEXT,
 	},
 	openai = {
-		url = "https://api.openai.com/v1/chat/completions",
-		model = "gpt-4",
-		system_message_context = DEFAULT_CONTEXT,
-	},
-	groq = {
-		url = "https://api.groq.com/openai/v1/chat/completions",
-		model = "deepseek-r1-distill-llama-70b",
 		system_message_context = DEFAULT_CONTEXT,
 	},
 }
 
-function LLM:new(provider, api_key, options)
-	if not PROVIDERS[provider] then
-		error("Unsupported provider: " .. provider)
+function LLM:new(interface, provider, api_key, options)
+	if not INTERFACES[interface] then
+		error("Unsupported interface: " .. interface)
 	end
 
 	local instance = {
 		provider = provider,
 		api_key = api_key,
-		options = vim.tbl_deep_extend("force", PROVIDERS[provider], options or {}),
+		interface = interface,
+		options = vim.tbl_deep_extend("force", INTERFACES[interface], options or {}),
 	}
 	return setmetatable(instance, self)
 end
+
 function LLM:_prepare_payload(prompt)
-	if self.provider == "anthropic" then
+	if self.interface == "anthropic" then
 		return {
 			model = self.options.model,
 			messages = {
@@ -80,7 +73,7 @@ function LLM:_prepare_headers()
 		"Content-Type: application/json",
 	}
 
-	if self.provider == "anthropic" then
+	if self.interface == "anthropic" then
 		table.insert(headers, "-H")
 		table.insert(headers, "x-api-key: " .. self.api_key)
 		table.insert(headers, "-H")
@@ -117,7 +110,7 @@ function LLM:generate(prompt, callback)
 				return
 			end
 
-			if self.provider == "anthropic" then
+			if self.interface == "anthropic" then
 				if response.delta and response.delta.text then
 					callback(response.delta.text)
 				end
