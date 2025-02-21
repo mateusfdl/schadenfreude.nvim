@@ -19,7 +19,7 @@ function get_lines_until_cursor()
 	local row = cursor[1] - 1
 	local col = cursor[2]
 
-	local lines = api.nvim_buf_get_lines(0, 0, row, false)
+	local lines = api.nvim_buf_get_lines(0, 0, row + 1, false)
 
 	if #lines > 0 then
 		local last_line = lines[#lines]
