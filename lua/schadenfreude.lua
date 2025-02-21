@@ -80,4 +80,57 @@ function M.send_message(opts)
 	end)
 end
 
+function M.select_model()
+	if #llms == 0 then
+		vim.api.nvim_echo({ { "No LLM providers configured", "Error" } }, true, {})
+		return
+	end
+
+	local model_names = {}
+	for _, llm in ipairs(llms) do
+		table.insert(model_names, llm.name)
+	end
+
+	local telescope = require("telescope")
+	if not telescope then
+		vim.api.nvim_echo(
+			{ { "Telescope is not available. Please ensure it’s installed and loaded.", "Error" } },
+			true,
+			{}
+		)
+		return
+	end
+
+	local actions = require("telescope.actions")
+	local pickers = require("telescope.pickers")
+	local finders = require("telescope.finders")
+	local config = require("telescope.config")
+	local action_state = require("telescope.actions.state")
+	pickers
+		.new({}, {
+			prompt_title = "Select LLM Model",
+			finder = finders.new_table({
+				results = model_names,
+			}),
+			sorter = config.values.generic_sorter({}),
+			attach_mappings = function(prompt_bufnr, map)
+				map("i", "<CR>", function()
+					local selection = action_state.get_selected_entry()
+					if selection then
+						for _, llm in ipairs(llms) do
+							if llm.name == selection.value then
+								current_llm = llm.llm
+								break
+							end
+						end
+						vim.api.nvim_echo({ { "Selected model: " .. selection.value, "Comment" } }, true, {})
+					end
+					actions.close(prompt_bufnr)
+				end)
+				return true
+			end,
+		})
+		:find()
+end
+
 return M
