@@ -11,3 +11,10 @@ end, {
 	end,
 	desc = "Switch the active LLM model",
 })
+
+vim.api.nvim_create_user_command("SendToChat", function()
+	local M = require("schadenfreude")
+	M.send_selection_to_chat()
+end, {
+	desc = "Send visual selection to the Chat buffer",
+})

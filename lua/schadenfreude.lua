@@ -86,11 +86,26 @@ function M.switch_model(name)
 	for _, llm in ipairs(M.llms) do
 		if llm.name == name then
 			current_llm = llm.llm
-			chat_instance:append_text("\n**[Switched to model: " .. name .. "]**")
+			vim.api.nvim_echo({ { "Switched to " .. name, "Comment" } }, true, {})
 			return
 		end
 	end
-	chat_instance:append_text("\n**[Error: Model " .. name .. " not found]**")
+
+	vim.api.nvim_echo({ { "Model not found", "Error" } }, true, {})
+end
+
+function M.send_selection_to_chat()
+	local selection = get_visual_selection()
+	if not selection or selection == "" then
+		vim.api.nvim_echo({ { "No selection found", "Error" } }, true, {})
+		return
+	end
+	if not chat_instance then
+		chat_instance = Chat:new()
+	end
+	local formatted_selection = "```" .. (vim.bo.filetype or "text") .. "\n" .. selection .. "\n```"
+	chat_instance:focus()
+	chat_instance:append_text("\n" .. formatted_selection .. "\n")
 end
 
 return M
