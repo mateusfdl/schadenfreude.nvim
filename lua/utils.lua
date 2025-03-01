@@ -148,9 +148,6 @@ function get_file_extension(filepath)
 	return filepath:match("%.([^%.]+)$") or ""
 end
 
---- Prepends file contents to the prompt with enhanced context for better AI understanding
---- @param prompt string # The original prompt text provided by the user
---- @return string # The modified prompt with file contents prepended and contextual instructions
 function prepend_file_contents(prompt)
 	local file_snippets = {}
 	local files_found = {}
@@ -162,31 +159,30 @@ function prepend_file_contents(prompt)
 
 	if #files_found > 0 then
 		table.insert(file_snippets, "\n===== FILE CONTEXT BEGINS =====")
-		table.insert(file_snippets, "# The following files are provided as context for your response.")
-		table.insert(file_snippets, "# Use these contents to inform your answer, focusing on the user's prompt below.")
-		table.insert(file_snippets, "# Each file is marked with its path and content type for clarity.")
+		table.insert(file_snippets, "# The following files are provided as context...")
 	end
 
 	local cleaned_prompt = prompt:gsub("!([^%s]+)", function(file_path)
-		local content = read_file_content(file_path)
-		local ext = get_file_extension(file_path) or ""
-
-		table.insert(file_snippets, "\n--- File: " .. file_path .. " ---")
-		table.insert(file_snippets, "# Filetype: " .. (ext ~= "" and ext or "unknown"))
-
-		if ext ~= "" then
-			table.insert(file_snippets, string.format("```%s\n%s\n```", ext, content))
-		else
-			table.insert(file_snippets, string.format("```\n%s\n```", content))
+		local full_path = vim.fn.expand(file_path)
+		if vim.fn.filereadable(full_path) == 0 then
+			table.insert(file_snippets, "\n--- File: " .. file_path .. " ---")
+			table.insert(file_snippets, "# Error: File not found or inaccessible")
+			table.insert(file_snippets, "--- End of " .. file_path .. " ---")
+			return ""
 		end
 
+		local content = read_file_content(file_path)
+		local ext = get_file_extension(file_path) or ""
+		table.insert(file_snippets, "\n--- File: " .. file_path .. " ---")
+		table.insert(file_snippets, "# Filetype: " .. (ext ~= "" and ext or "unknown"))
+		table.insert(file_snippets, string.format("```%s\n%s\n```", ext, content))
 		table.insert(file_snippets, "--- End of " .. file_path .. " ---")
 		return ""
 	end)
 
 	if #file_snippets > 0 then
 		table.insert(file_snippets, "\n===== FILE CONTEXT ENDS =====")
-		table.insert(file_snippets, "# User Prompt Begins Below - Apply the file context as needed:")
+		table.insert(file_snippets, "# User Prompt Begins Below...")
 	end
 
 	return table.concat(file_snippets, "\n") .. "\n" .. cleaned_prompt
