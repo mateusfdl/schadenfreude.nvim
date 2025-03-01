@@ -62,7 +62,9 @@ function M.send_message(opts)
 	end
 
 	local prompt = get_prompt(opts.replace or false)
-	prompt = prepend_file_contents(prompt)
+	if has_file_references(prompt) then
+		prompt = prepend_file_contents(prompt)
+	end
 
 	if opts.chat and vim.api.nvim_get_current_buf() ~= chat_instance.buffer then
 		chat_instance:focus()

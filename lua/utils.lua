@@ -148,20 +148,52 @@ function get_file_extension(filepath)
 	return filepath:match("%.([^%.]+)$") or ""
 end
 
---- @param prompt string # The prompt text to prepend with file contents.
---- @return string # The prompt text with file contents prepended.
+--- Prepends file contents to the prompt with enhanced context for better AI understanding
+--- @param prompt string # The original prompt text provided by the user
+--- @return string # The modified prompt with file contents prepended and contextual instructions
 function prepend_file_contents(prompt)
 	local file_snippets = {}
-	local cleaned_prompt = prompt:gsub("!([^%s]+)", function(file_path)
-		local content = read_file_content(file_path)
-		local ext = get_file_extension(file_path) or ""
-		if ext ~= "" then
-			table.insert(file_snippets, string.format("```%s\n%s\n```\n\n", ext, content))
-		else
-			table.insert(file_snippets, string.format("```\n%s\n```\n\n", content))
-		end
+	local files_found = {}
+
+	prompt:gsub("!([^%s]+)", function(file_path)
+		table.insert(files_found, file_path)
 		return ""
 	end)
 
-	return table.concat(file_snippets, "") .. cleaned_prompt
+	if #files_found > 0 then
+		table.insert(file_snippets, "\n===== FILE CONTEXT BEGINS =====")
+		table.insert(file_snippets, "# The following files are provided as context for your response.")
+		table.insert(file_snippets, "# Use these contents to inform your answer, focusing on the user's prompt below.")
+		table.insert(file_snippets, "# Each file is marked with its path and content type for clarity.")
+	end
+
+	local cleaned_prompt = prompt:gsub("!([^%s]+)", function(file_path)
+		local content = read_file_content(file_path)
+		local ext = get_file_extension(file_path) or ""
+
+		table.insert(file_snippets, "\n--- File: " .. file_path .. " ---")
+		table.insert(file_snippets, "# Filetype: " .. (ext ~= "" and ext or "unknown"))
+
+		if ext ~= "" then
+			table.insert(file_snippets, string.format("```%s\n%s\n```", ext, content))
+		else
+			table.insert(file_snippets, string.format("```\n%s\n```", content))
+		end
+
+		table.insert(file_snippets, "--- End of " .. file_path .. " ---")
+		return ""
+	end)
+
+	if #file_snippets > 0 then
+		table.insert(file_snippets, "\n===== FILE CONTEXT ENDS =====")
+		table.insert(file_snippets, "# User Prompt Begins Below - Apply the file context as needed:")
+	end
+
+	return table.concat(file_snippets, "\n") .. "\n" .. cleaned_prompt
+end
+
+--- @param prompt string # The prompt text to check for file references
+--- @return boolean # Returns true if the prompt contains file references (starting with !), false otherwise
+function has_file_references(prompt)
+	return prompt:match("!([^%s]+)") ~= nil
 end
