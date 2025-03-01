@@ -44,7 +44,10 @@ function Chat:start()
 
 	if chat_bufnr == -1 then
 		self.window = vim.api.nvim_get_current_win()
-		return self:_create_buffer(self.window)
+		local buf = self:_create_buffer(self.window)
+		vim.api.nvim_buf_set_option(buf, "syntax", "markdown")
+		vim.api.nvim_command("runtime! syntax/markdown.vim")
+		return buf
 	else
 		local existing_win = self:_find_window(chat_bufnr)
 		if existing_win then
