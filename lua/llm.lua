@@ -136,4 +136,12 @@ function LLM:generate(prompt, callback)
 	}):start()
 end
 
+function LLM:clone()
+	return LLM:new(self.interface, self.provider, self.api_key, self.options)
+end
+
+function LLM:set_new_context(context)
+	self.options.system_message_context = context
+end
+
 return LLM

@@ -18,3 +18,11 @@ vim.api.nvim_create_user_command("SendToChat", function()
 end, {
 	desc = "Send visual selection to the Chat buffer",
 })
+
+vim.api.nvim_create_user_command("RefactorCode", function()
+	local M = require("schadenfreude")
+	M.refactor_code()
+end, {
+	desc = "Refactor visually selected code in current buffer",
+	range = true,
+})
