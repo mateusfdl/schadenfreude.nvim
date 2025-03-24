@@ -193,3 +193,20 @@ end
 function has_file_references(prompt)
 	return prompt:match("!([^%s]+)") ~= nil
 end
+
+--- @param content string # The content to log
+--- @param log_file string # The path to the log file
+function log_to_file(content, log_file)
+	local f = io.open(log_file, "a")
+	if not f then
+		vim.api.nvim_echo({ { "Error: Could not open log file " .. log_file, "Error" } }, true, {})
+		return false
+	end
+	
+	local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+	f:write("\n\n===== " .. timestamp .. " =====\n")
+	f:write(content)
+	f:write("\n===== END =====\n")
+	f:close()
+	return true
+end

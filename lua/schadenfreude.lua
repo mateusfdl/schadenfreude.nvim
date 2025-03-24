@@ -66,6 +66,10 @@ function M.send_message(opts)
 	end
 
 	local prompt = get_prompt(opts.replace or false)
+	
+	-- Store the user's message
+	chat_instance.last_user_message = prompt
+	
 	if has_file_references(prompt) then
 		prompt = prepend_file_contents(prompt)
 	end
@@ -80,17 +84,24 @@ function M.send_message(opts)
 	end
 
 	chat_instance:append_text("\n\n")
-
+	
+	local ai_response_buffer = ""
 	active_job = current_llm:generate(prompt, function(content)
 		chat_instance:append_text(content)
-	end)
+		ai_response_buffer = ai_response_buffer .. content
+	end, chat_instance)
+	
+	-- After the job completion, store the AI response
+	vim.defer_fn(function()
+		chat_instance.last_ai_response = ai_response_buffer
+	end, 1000)
 end
 
 function M.switch_model(name)
 	for _, llm in ipairs(M.llms) do
 		if llm.name == name then
 			current_llm = llm.llm
-			code_instance = Code:new(llm.name, llm.api_key, llm.options)
+			code_instance = Code:new(llm.llm)
 			vim.api.nvim_echo({ { "Switched to " .. name, "Comment" } }, true, {})
 			return
 		end
