@@ -1,5 +1,10 @@
 {
-    "diagnostics.globals": [
-        "vim"
-    ]
+  "diagnostics.globals": [
+    "vim"
+  ],
+  "paths": {
+    "lua": {
+      "path": "~/.local/share/mise/installs/lua/5.4.6/luarocks/lib/luarocks/rocks-5.4/busted/2.2.0-1/bin/busted"
+    }
+  }
 }
