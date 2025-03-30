@@ -102,7 +102,9 @@ function stream_string_to_chat_buffer(str)
 
 		local lines = vim.split(str, "\n", { plain = true })
 		cmd("undojoin")
-		api.nvim_put(lines, "c", true, true)
+		local last_line = vim.api.nvim_buf_line_count(chat_bufnr)
+		local last_col = vim.api.nvim_buf_get_lines(chat_bufnr, last_line - 1, last_line, true)[1]:len()
+		vim.api.nvim_buf_set_text(chat_bufnr, last_line - 1, last_col, last_line - 1, last_col, lines)
 	end)
 end
 
@@ -165,9 +167,6 @@ function prepend_file_contents(prompt)
 	local cleaned_prompt = prompt:gsub("!([^%s]+)", function(file_path)
 		local full_path = vim.fn.expand(file_path)
 		if vim.fn.filereadable(full_path) == 0 then
-			table.insert(file_snippets, "\n--- File: " .. file_path .. " ---")
-			table.insert(file_snippets, "# Error: File not found or inaccessible")
-			table.insert(file_snippets, "--- End of " .. file_path .. " ---")
 			return ""
 		end
 
@@ -202,7 +201,7 @@ function log_to_file(content, log_file)
 		vim.api.nvim_echo({ { "Error: Could not open log file " .. log_file, "Error" } }, true, {})
 		return false
 	end
-	
+
 	local timestamp = os.date("%Y-%m-%d %H:%M:%S")
 	f:write("\n\n===== " .. timestamp .. " =====\n")
 	f:write(content)
