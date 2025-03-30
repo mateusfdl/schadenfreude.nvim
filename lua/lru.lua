@@ -32,7 +32,7 @@ function LRU:put(key, tokens, count_tokens)
 end
 
 function LRU:get(key)
-	cached_entry = self.cache[key]
+	local cached_entry = self.cache[key]
 
 	if cached_entry == nil then
 		return nil
