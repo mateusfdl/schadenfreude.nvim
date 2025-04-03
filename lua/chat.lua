@@ -7,8 +7,6 @@ function Chat:new()
 		window = nil,
 		history = {},
 		current_job = nil,
-		last_user_message = nil,
-		last_ai_response = nil,
 	}
 	return setmetatable(instance, self)
 end

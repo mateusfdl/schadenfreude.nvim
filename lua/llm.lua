@@ -55,28 +55,15 @@ function LLM:new(interface, provider, api_key, options)
 	return setmetatable(instance, self)
 end
 
-function LLM:_prepare_payload(prompt, chat_history)
+function LLM:_prepare_payload(prompt)
+	local messages = {}
+
+	table.insert(messages, {
+		role = "user",
+		content = prompt,
+	})
+
 	if self.interface == "anthropic" then
-		local messages = {}
-
-		-- Add chat history if available
-		if chat_history and chat_history.last_user_message and chat_history.last_ai_response then
-			table.insert(messages, {
-				role = "user",
-				content = chat_history.last_user_message,
-			})
-			table.insert(messages, {
-				role = "assistant",
-				content = chat_history.last_ai_response,
-			})
-		end
-
-		-- Add current prompt
-		table.insert(messages, {
-			role = "user",
-			content = prompt,
-		})
-
 		return {
 			model = self.options.model,
 			messages = messages,
@@ -86,31 +73,11 @@ function LLM:_prepare_payload(prompt, chat_history)
 			stream = true,
 		}
 	else
-		local messages = {
-			{
-				role = "system",
-				content = self.options.system_message_context,
-			},
-		}
-
-		-- Add chat history if available
-		if chat_history and chat_history.last_user_message and chat_history.last_ai_response then
-			table.insert(messages, {
-				role = "user",
-				content = chat_history.last_user_message,
-			})
-			table.insert(messages, {
-				role = "assistant",
-				content = chat_history.last_ai_response,
-			})
-		end
-
-		-- Add current prompt
 		table.insert(messages, {
-			role = "user",
-			content = prompt,
+			role = "system",
+			content = self.options.system_message_context,
 		})
-		
+
 		return {
 			model = self.options.model,
 			messages = messages,
@@ -140,11 +107,10 @@ function LLM:_prepare_headers()
 	return headers
 end
 
-function LLM:generate(prompt, callback, chat_history)
-	local payload = self:_prepare_payload(prompt, chat_history)
+function LLM:generate(prompt, callback)
+	local payload = self:_prepare_payload(prompt)
 	local headers = self:_prepare_headers()
 
-	-- Log the payload if debug is enabled
 	if self.debug then
 		local log_content = "Model: " .. self.provider .. " (" .. self.interface .. ")\n"
 		log_content = log_content .. "System context:\n" .. self.options.system_message_context .. "\n\n"
