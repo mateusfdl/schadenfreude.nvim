@@ -26,3 +26,18 @@ end, {
 	desc = "Refactor visually selected code in current buffer",
 	range = true,
 })
+
+local function setup_ai_response_highlighting()
+	vim.wo.foldmethod = "syntax"
+	vim.wo.foldenable = true
+	vim.wo.conceallevel = 2
+	vim.wo.concealcursor = "nc"
+	vim.wo.foldlevel = 1
+	vim.api.nvim_set_hl(0, "Conceal", { bold = true, fg = "#00FF00" })
+	vim.api.nvim_set_hl(0, "aiResponseStart", { link = "Conceal" })
+end
+
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = "markdown",
+	callback = setup_ai_response_highlighting,
+})
