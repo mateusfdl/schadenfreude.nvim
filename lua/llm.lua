@@ -129,6 +129,7 @@ function LLM:generate(prompt, callback)
 	table.insert(args, vim.json.encode(payload))
 	table.insert(args, self.options.url)
 
+	callback("\n@AI :BEGIN\n")
 	return Job:new({
 		command = "curl",
 		args = args,
@@ -153,10 +154,13 @@ function LLM:generate(prompt, callback)
 				end
 			end
 		end,
-		on_stderr = function(_, data)
+		on_stderr = function(err, data)
 			vim.schedule(function()
-				print("Error: " .. vim.inspect(data))
+				print("Error: " .. vim.inspect(err, data))
 			end)
+		end,
+		on_exit = function(j, return_val)
+			callback("\n@AI :FINISH\n")
 		end,
 	}):start()
 end
@@ -174,4 +178,3 @@ function LLM:set_new_context(context)
 end
 
 return LLM
-
