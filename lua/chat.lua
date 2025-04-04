@@ -1,3 +1,6 @@
+local Interpreter = require("interpreter")
+local ThinkHandler = require("tags.handlers.think")
+
 local Chat = {}
 Chat.__index = Chat
 
@@ -7,7 +10,9 @@ function Chat:new()
 		window = nil,
 		history = {},
 		current_job = nil,
+		interpreter = Interpreter:new(),
 	}
+
 	return setmetatable(instance, self)
 end
 
@@ -42,6 +47,7 @@ end
 function Chat:start()
 	local chat_bufnr = self:_find_buffer()
 
+	self:register_tag_handlers()
 	if chat_bufnr == -1 then
 		self.window = vim.api.nvim_get_current_win()
 		local buf = self:_create_buffer(self.window)
@@ -63,6 +69,10 @@ function Chat:start()
 			return chat_bufnr
 		end
 	end
+end
+
+function Chat:register_tag_handlers()
+	self.interpreter:register_handler("think", ThinkHandler:new())
 end
 
 function Chat:focus()
@@ -92,7 +102,18 @@ function Chat:append_text(text)
 			return
 		end
 
-		local new_lines = vim.split(text, "\n", true)
+		local context = {
+			buffer = self.buffer,
+			window = self.window,
+		}
+
+		local processed_text = self.interpreter:process(text, context)
+
+		if not processed_text or processed_text == "" then
+			return
+		end
+
+		local new_lines = vim.split(processed_text, "\n", true)
 
 		local last_line_idx = vim.api.nvim_buf_line_count(self.buffer) - 1
 		local last_line = vim.api.nvim_buf_get_lines(self.buffer, last_line_idx, last_line_idx + 1, false)[1] or ""
