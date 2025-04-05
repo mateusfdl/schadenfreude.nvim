@@ -13,6 +13,7 @@ function Chat:new()
 		interpreter = Interpreter:new(),
 	}
 
+	instance.interpreter:register_handler("think", ThinkHandler:new())
 	return setmetatable(instance, self)
 end
 
@@ -47,7 +48,6 @@ end
 function Chat:start()
 	local chat_bufnr = self:_find_buffer()
 
-	self:register_tag_handlers()
 	if chat_bufnr == -1 then
 		self.window = vim.api.nvim_get_current_win()
 		local buf = self:_create_buffer(self.window)
