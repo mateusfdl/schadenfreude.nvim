@@ -1,5 +1,8 @@
 local Job = require("plenary.job")
 
+-- Initialize random seed
+math.randomseed(os.time())
+
 local LLM = {}
 LLM.__index = LLM
 
@@ -129,7 +132,14 @@ function LLM:generate(prompt, callback)
 	table.insert(args, vim.json.encode(payload))
 	table.insert(args, self.options.url)
 
-	callback("\n@AI :BEGIN\n")
+	local names = {"jhonny", "pascal", "haskell", "pneumonia", "rust", "erlang", "ruby", "lisp", "lua"}
+	local name = names[math.random(1, #names)]
+	local uid = ""
+	for i = 1, 10 do
+		uid = uid .. math.random(0, 9)
+	end
+	local response_id = name .. "-" .. uid
+	callback("\n@AI :BEGIN == ID:" .. response_id .. "\n")
 	return Job:new({
 		command = "curl",
 		args = args,
