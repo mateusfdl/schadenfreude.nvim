@@ -119,78 +119,14 @@ function handle_chat_or_buffer(str)
 	end
 end
 
---- @param str string|nil # The file path to read from.
---- @return string # The file content or an error message if the file could not be opened.
-function read_file_content(filepath)
-	local cwd = vim.fn.getcwd()
-	local full_path
-
-	if filepath:sub(1, 1) == "/" then
-		full_path = filepath
-	elseif filepath:sub(1, 2) == "~/" then
-		full_path = os.getenv("HOME") .. filepath:sub(2)
-	elseif filepath:sub(1, 2) == "./" then
-		full_path = cwd .. filepath:sub(2)
-	else
-		full_path = cwd .. "/" .. filepath
-	end
-	local f = io.open(full_path, "r")
-	if not f then
-		return ("[Error: Could not open file '%s']"):format(filepath)
-	end
-
-	local content = f:read("*all")
-	f:close()
-	return content
-end
-
---- @param filepath string|nil # The filepath to extract the extension from.
---- @return string # The file extension or an empty string if no extension is found.
-function get_file_extension(filepath)
-	return filepath:match("%.([^%.]+)$") or ""
-end
-
-function prepend_file_contents(prompt)
-	local file_snippets = {}
-	local files_found = {}
-
-	prompt:gsub("!([^%s]+)", function(file_path)
-		table.insert(files_found, file_path)
-		return ""
-	end)
-
-	if #files_found > 0 then
-		table.insert(file_snippets, "\n===== FILE CONTEXT BEGINS =====")
-		table.insert(file_snippets, "# The following files are provided as context...")
-	end
-
-	local cleaned_prompt = prompt:gsub("!([^%s]+)", function(file_path)
-		local full_path = vim.fn.expand(file_path)
-		if vim.fn.filereadable(full_path) == 0 then
-			return ""
-		end
-
-		local content = read_file_content(file_path)
-		local ext = get_file_extension(file_path) or ""
-		table.insert(file_snippets, "\n--- File: " .. file_path .. " ---")
-		table.insert(file_snippets, "# Filetype: " .. (ext ~= "" and ext or "unknown"))
-		table.insert(file_snippets, string.format("```%s\n%s\n```", ext, content))
-		table.insert(file_snippets, "--- End of " .. file_path .. " ---")
-		return ""
-	end)
-
-	if #file_snippets > 0 then
-		table.insert(file_snippets, "\n===== FILE CONTEXT ENDS =====")
-		table.insert(file_snippets, "# User Prompt Begins Below...")
-	end
-
-	return table.concat(file_snippets, "\n") .. "\n" .. cleaned_prompt
-end
-
 --- @param prompt string # The prompt text to check for file references
 --- @return boolean # Returns true if the prompt contains file references (starting with !), false otherwise
 function has_file_references(prompt)
-	return prompt:match("!([^%s]+)") ~= nil
+	return prompt:match("@([^%s]+)") ~= nil
+end
+
+function has_wildcard(prompt)
+	return prompt:match("@([^%s]+)%*") ~= nil
 end
 
 --- @param content string # The content to log

@@ -1,6 +1,8 @@
 local Chat = require("chat")
 local LLM = require("llm")
 local Code = require("code")
+local Command = require("command")
+
 require("utils")
 
 local M = {}
@@ -9,6 +11,7 @@ local chat_instance = nil
 local code_instance = nil
 local current_llm = nil
 local active_job = nil
+local command_instance = nil
 M.llms = {}
 
 function M.setup(configs)
@@ -53,6 +56,11 @@ function M.open_chat()
 	if not chat_instance then
 		chat_instance = Chat:new()
 	end
+
+	if not command_instance then
+		command_instance = Command:new()
+	end
+
 	chat_instance:start()
 end
 
@@ -65,11 +73,7 @@ function M.send_message(opts)
 		opts.replace = true
 	end
 
-	local prompt = get_prompt(opts.replace or false)
-
-	if has_file_references(prompt) then
-		prompt = prepend_file_contents(prompt)
-	end
+	local prompt = command_instance:handle(get_prompt(opts.replace or false))
 
 	if opts.chat and vim.api.nvim_get_current_buf() ~= chat_instance.buffer then
 		chat_instance:focus()

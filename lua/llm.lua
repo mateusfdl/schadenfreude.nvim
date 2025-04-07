@@ -33,6 +33,11 @@ Constraints:
 - Avoid modifying the user's code unless explicitly requested.
 - Do not overwhelm with excessive suggestions—focus on high-impact improvements.
 - Respect the user's coding style unless it conflicts with functionality or best practices.
+- DO NOT USE AI :BEGIN NEITHER AI :FINISH, this is handlded by the plugin so don't use it at all.
+- When code implementation is asked, ONLY PROVIDE THE CODE AND NOTHING MORE THAN ONLY THE CODE. AVOID COMMENTS AND EXPLANATIONS AT ALL UNTIL REQUESTED
+- Avoid comments like here's the implementation or anything when coding tasks is required
+
+REMEMBER, FOLLOW THOSE RULES STRICTLY, IF NOT, YOU WILL BE CHARGED WITH 2 THOUSAND DOLLARS FOR EACH BREAKEN RULE
 ]]
 local INTERFACES = {
 	anthropic = {
@@ -115,25 +120,13 @@ function LLM:generate(prompt, callback)
 	local payload = self:_prepare_payload(prompt)
 	local headers = self:_prepare_headers()
 
-	if self.debug then
-		local log_content = "Model: " .. self.provider .. " (" .. self.interface .. ")\n"
-		log_content = log_content .. "System context:\n" .. self.options.system_message_context .. "\n\n"
-		log_content = log_content .. "User prompt:\n" .. prompt .. "\n\n"
-		log_content = log_content .. "Full payload:\n" .. vim.inspect(payload)
-
-		local success = log_to_file(log_content, self.debug_log_file)
-		if success then
-			vim.api.nvim_echo({ { "Debug: Logged request to " .. self.debug_log_file, "Comment" } }, true, {})
-		end
-	end
-
 	local args = vim.list_extend({ "-N", "-X", "POST" }, headers)
 
 	table.insert(args, "-d")
 	table.insert(args, vim.json.encode(payload))
 	table.insert(args, self.options.url)
 
-	local names = {"jhonny", "pascal", "haskell", "pneumonia", "rust", "erlang", "ruby", "lisp", "lua"}
+	local names = { "jhonny", "pascal", "haskell", "pneumonia", "rust", "erlang", "ruby", "lisp", "lua" }
 	local name = names[math.random(1, #names)]
 	local uid = ""
 	for i = 1, 10 do
