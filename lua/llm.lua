@@ -72,7 +72,7 @@ function LLM:_prepare_payload(prompt)
 			model = self.options.model,
 			messages = messages,
 			system = self.options.system_message_context,
-			max_tokens = 2048,
+			max_tokens = 101000,
 			temperature = 0.6,
 			stream = true,
 		}
@@ -85,7 +85,7 @@ function LLM:_prepare_payload(prompt)
 		return {
 			model = self.options.model,
 			messages = messages,
-			max_tokens = 2048,
+			max_tokens = 101000,
 			temperature = 0.6,
 			stream = true,
 		}
