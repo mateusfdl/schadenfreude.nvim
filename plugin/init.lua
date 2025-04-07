@@ -1,12 +1,3 @@
-vim.g.schadenfreude_debug = false
-
-vim.api.nvim_create_user_command("ToggleDebug", function()
-	vim.g.schadenfreude_debug = not vim.g.schadenfreude_debug
-	vim.api.nvim_echo({ { "Debug mode " .. (vim.g.schadenfreude_debug and "enabled" or "disabled"), "Comment" } }, true, {})
-end, {
-	desc = "Toggle debug mode for schadenfreude",
-})
-
 vim.api.nvim_create_user_command("ModelSwitch", function(opts)
 	local M = require("schadenfreude")
 	M.switch_model(opts.args)
