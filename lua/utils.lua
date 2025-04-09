@@ -13,8 +13,10 @@ local cmd = vim.cmd
 local feedkeys = api.nvim_feedkeys
 local termcodes = api.nvim_replace_termcodes
 
+local M = {}
+
 --- @return string # A single string containing all lines (truncated at the cursor) joined by "\n".
-function get_lines_until_cursor()
+function M.get_lines_until_cursor()
 	local cursor = api.nvim_win_get_cursor(0)
 	local row = cursor[1] - 1
 	local col = cursor[2]
@@ -30,7 +32,7 @@ function get_lines_until_cursor()
 end
 
 --- @return string # The text of the visual selection, or an empty string if no selection is found.
-function get_visual_selection()
+function M.get_visual_selection()
 	local start_pos = fn.getpos("'<")
 	local end_pos = fn.getpos("'>")
 
@@ -70,8 +72,8 @@ end
 
 --- @param replace boolean # Whether to replace the visual selection with the returned text.
 --- @return string # The determined prompt text (either visual selection or lines until cursor).
-function get_prompt(replace)
-	local visual_lines = get_visual_selection()
+function M.get_prompt(replace)
+	local visual_lines = M.get_visual_selection()
 	if visual_lines and #visual_lines > 0 then
 		if not replace then
 			feedkeys(termcodes("<Esc>", false, true, true), "nx", false)
@@ -79,11 +81,16 @@ function get_prompt(replace)
 		return table.concat(vim.split(visual_lines, "\n"), "\n")
 	end
 
-	return get_lines_until_cursor()
+	return M.get_lines_until_cursor()
 end
 
+-- For backward compatibility, also define global functions
+get_prompt = M.get_prompt
+get_visual_selection = M.get_visual_selection
+get_lines_until_cursor = M.get_lines_until_cursor
+
 --- @param str string|nil # The string to stream into the "Chat" buffer. If nil, nothing happens.
-function stream_string_to_chat_buffer(str)
+function M.stream_string_to_chat_buffer(str)
 	if not str then
 		return
 	end
@@ -109,29 +116,29 @@ function stream_string_to_chat_buffer(str)
 end
 
 --- @param str string|nil # The string to handle and potentially send to "Chat".
-function handle_chat_or_buffer(str)
+function M.handle_chat_or_buffer(str)
 	local current_buf = api.nvim_get_current_buf()
 	if api.nvim_buf_get_name(current_buf) == "Chat" then
-		stream_string_to_chat_buffer(str)
+		M.stream_string_to_chat_buffer(str)
 	else
-		stream_string_to_chat_buffer("")
-		stream_string_to_chat_buffer(str)
+		M.stream_string_to_chat_buffer("")
+		M.stream_string_to_chat_buffer(str)
 	end
 end
 
 --- @param prompt string # The prompt text to check for file references
 --- @return boolean # Returns true if the prompt contains file references (starting with !), false otherwise
-function has_file_references(prompt)
+function M.has_file_references(prompt)
 	return prompt:match("@([^%s]+)") ~= nil
 end
 
-function has_wildcard(prompt)
+function M.has_wildcard(prompt)
 	return prompt:match("@([^%s]+)%*") ~= nil
 end
 
 --- @param content string # The content to log
 --- @param log_file string # The path to the log file
-function log_to_file(content, log_file)
+function M.log_to_file(content, log_file)
 	local f = io.open(log_file, "a")
 	if not f then
 		vim.api.nvim_echo({ { "Error: Could not open log file " .. log_file, "Error" } }, true, {})
@@ -145,3 +152,5 @@ function log_to_file(content, log_file)
 	f:close()
 	return true
 end
+
+return M

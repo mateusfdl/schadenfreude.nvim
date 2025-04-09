@@ -2,8 +2,7 @@ local Chat = require("chat")
 local LLM = require("llm")
 local Code = require("code")
 local Command = require("command")
-
-require("utils")
+local Utils = require("utils")
 
 local M = {}
 
@@ -73,7 +72,11 @@ function M.send_message(opts)
 		opts.replace = true
 	end
 
-	local prompt = command_instance:handle(get_prompt(opts.replace or false))
+	if not command_instance then
+		command_instance = Command:new()
+	end
+
+	local prompt = command_instance:handle(Utils.get_prompt(opts.replace or false))
 
 	if opts.chat and vim.api.nvim_get_current_buf() ~= chat_instance.buffer then
 		chat_instance:focus()
@@ -104,7 +107,7 @@ function M.switch_model(name)
 end
 
 function M.send_selection_to_chat()
-	local selection = get_visual_selection()
+	local selection = Utils.get_visual_selection()
 	if not selection or selection == "" then
 		vim.api.nvim_echo({ { "No selection found", "Error" } }, true, {})
 		return

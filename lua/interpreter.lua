@@ -33,17 +33,34 @@ function Interpreter:process(text, context)
 		if not tag_start then
 			break
 		end
-
+		
+		local next_char = result:sub(tag_start + 1, tag_start + 1)
+		local is_valid_tag_start = next_char:match("[%a/]")
+		
+		if not is_valid_tag_start then
+			pos = tag_start + 1
+			goto continue
+		end
+		
 		tag_end = result:find(">", tag_start)
 		if not tag_end then
-			self.buffer = result:sub(tag_start)
-			result = result:sub(1, tag_start - 1)
-			break
+			pos = tag_start + 1
+			goto continue
 		end
-
+		
 		local tag_content = result:sub(tag_start + 1, tag_end - 1)
 		local is_closing = tag_content:sub(1, 1) == "/"
 		local tag_name = is_closing and tag_content:sub(2) or tag_content
+		
+		if not tag_name:match("^[%a%d_]+$") then
+			pos = tag_start + 1
+			goto continue
+		end
+		
+		if not self.tag_handlers[tag_name] then
+			pos = tag_start + 1
+			goto continue
+		end
 
 		if vim.g.schadenfreude_debug then
 			vim.schedule(function()
@@ -51,45 +68,43 @@ function Interpreter:process(text, context)
 			end)
 		end
 
-		if self.tag_handlers[tag_name] then
-			local handler = self.tag_handlers[tag_name]
+		local handler = self.tag_handlers[tag_name]
 
-			if is_closing then
-				if #self.current_tags > 0 and self.current_tags[#self.current_tags].name == tag_name then
-					local tag_info = table.remove(self.current_tags)
-					local content = result:sub(tag_info.content_start, tag_start - 1)
+		if is_closing then
+			if #self.current_tags > 0 and self.current_tags[#self.current_tags].name == tag_name then
+				local tag_info = table.remove(self.current_tags)
+				local content = result:sub(tag_info.content_start, tag_start - 1)
 
-					local replacement = handler:on_tag_end(content, context)
+				local replacement = handler:on_tag_end(content, context)
 
-					local prefix = result:sub(1, tag_info.start - 1)
-					local suffix = result:sub(tag_end + 1)
+				local prefix = result:sub(1, tag_info.start - 1)
+				local suffix = result:sub(tag_end + 1)
 
-					result = prefix .. (replacement or "") .. suffix
-					pos = #prefix + (replacement and #replacement or 0) + 1
-				else
-					result = result:sub(1, tag_start - 1) .. result:sub(tag_end + 1)
-					pos = tag_start
-				end
+				result = prefix .. (replacement or "") .. suffix
+				pos = #prefix + (replacement and #replacement or 0) + 1
 			else
-				table.insert(self.current_tags, {
-					name = tag_name,
-					start = tag_start,
-					content_start = tag_end + 1,
-				})
-
-				local replacement = handler:on_tag_start(context)
-
-				if replacement then
-					result = result:sub(1, tag_start - 1) .. replacement .. result:sub(tag_end + 1)
-					pos = tag_start + #replacement
-				else
-					result = result:sub(1, tag_start - 1) .. result:sub(tag_end + 1)
-					pos = tag_start
-				end
+				result = result:sub(1, tag_start - 1) .. result:sub(tag_end + 1)
+				pos = tag_start
 			end
 		else
-			pos = tag_end + 1
+			table.insert(self.current_tags, {
+				name = tag_name,
+				start = tag_start,
+				content_start = tag_end + 1,
+			})
+
+			local replacement = handler:on_tag_start(context)
+
+			if replacement then
+				result = result:sub(1, tag_start - 1) .. replacement .. result:sub(tag_end + 1)
+				pos = tag_start + #replacement
+			else
+				result = result:sub(1, tag_start - 1) .. result:sub(tag_end + 1)
+				pos = tag_start
+			end
 		end
+		
+		::continue::
 	end
 
 	if #self.current_tags > 0 then
@@ -112,4 +127,3 @@ function Interpreter:reset()
 end
 
 return Interpreter
-
