@@ -34,7 +34,7 @@ function FileHandler:handle(prompt)
 						table.insert(contents, "# Filetype: " .. self:_get_file_extension(file) or "unknown")
 						table.insert(
 							contents,
-							string.format("```%s\n%s\n```", self:get_file_extension(file) or "", f:read("*all"))
+							string.format("```%s\n%s\n```", self:_get_file_extension(file) or "", f:read("*all"))
 						)
 						table.insert(contents, "--- End of " .. file .. " ---")
 						f:close()
