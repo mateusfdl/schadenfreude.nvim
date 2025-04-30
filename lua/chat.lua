@@ -17,20 +17,21 @@ function Chat:new()
 	return setmetatable(instance, self)
 end
 
-function Chat:_find_buffer()
-	return vim.fn.bufnr("Chat")
+function Chat:find_buffer()
+	return vim.fn.bufnr("LLM Chat")
 end
 
-function Chat:_find_window(bufnr)
+function Chat:find_window(bufnr)
 	for _, win in ipairs(vim.api.nvim_list_wins()) do
 		if vim.api.nvim_win_get_buf(win) == bufnr then
 			return win
 		end
 	end
+
 	return nil
 end
 
-function Chat:_create_buffer(window_id)
+function Chat:create_buffer(window_id)
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_win_set_buf(window_id, buf)
 
@@ -40,22 +41,22 @@ function Chat:_create_buffer(window_id)
 
 	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
 	vim.api.nvim_buf_set_option(buf, "conceallevel", 2)
-	vim.api.nvim_buf_set_name(buf, "Chat")
+	vim.api.nvim_buf_set_name(buf, "LLM Chat")
 	self.buffer = buf
 	return buf
 end
 
 function Chat:start()
-	local chat_bufnr = self:_find_buffer()
+	local chat_bufnr = self:find_buffer()
 
 	if chat_bufnr == -1 then
 		self.window = vim.api.nvim_get_current_win()
-		local buf = self:_create_buffer(self.window)
+		local buf = self:create_buffer(self.window)
 		vim.api.nvim_buf_set_option(buf, "syntax", "markdown")
 		vim.api.nvim_command("runtime! syntax/markdown.vim")
 		return buf
 	else
-		local existing_win = self:_find_window(chat_bufnr)
+		local existing_win = self:find_window(chat_bufnr)
 		if existing_win then
 			vim.api.nvim_set_current_win(existing_win)
 			self.window = existing_win
@@ -71,17 +72,13 @@ function Chat:start()
 	end
 end
 
-function Chat:register_tag_handlers()
-	self.interpreter:register_handler("think", ThinkHandler:new())
-end
-
 function Chat:focus()
-	local chat_bufnr = self:_find_buffer()
+	local chat_bufnr = self:find_buffer()
 
 	if chat_bufnr == -1 then
 		return self:start()
 	else
-		local chat_win = self:_find_window(chat_bufnr)
+		local chat_win = self:find_window(chat_bufnr)
 		if chat_win then
 			vim.api.nvim_set_current_win(chat_win)
 		else

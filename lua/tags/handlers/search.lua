@@ -26,7 +26,6 @@ function SearchHandler:on_tag_end(content, context)
 			context._operations = {}
 		end
 
-		-- Store the search content to be paired with a replace later
 		table.insert(context._operations, {
 			type = "search",
 			content = context._search_content,
@@ -34,7 +33,6 @@ function SearchHandler:on_tag_end(content, context)
 			applied = false,
 		})
 
-		-- Save in context for easy access by replace tag
 		context._last_search = context._current_search_idx
 
 		context._search_content = nil

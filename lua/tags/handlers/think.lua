@@ -48,11 +48,11 @@ function ThinkHandler:on_tag_start(context)
 	return self.thinking_indicator
 end
 
-function ThinkHandler:on_content(content, context)
+function ThinkHandler:on_content(_, _)
 	return ""
 end
 
-function ThinkHandler:on_tag_end(content, context)
+function ThinkHandler:on_tag_end(_, context)
 	if context._think_pos and context.buffer and vim.api.nvim_buf_is_valid(context.buffer) then
 		local row, col = unpack(context._think_pos)
 		local line = vim.api.nvim_buf_get_lines(context.buffer, row, row + 1, false)[1] or ""

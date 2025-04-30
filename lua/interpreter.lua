@@ -38,13 +38,13 @@ function Interpreter:process(text, context)
 		local is_valid_tag_start = next_char:match("[%a/]")
 
 		if not is_valid_tag_start then
-			pos = tag_start + 1
+			pos = tag_start
 			goto continue
 		end
 
 		tag_end = result:find(">", tag_start)
 		if not tag_end then
-			pos = tag_start + 1
+			pos = tag_start
 			goto continue
 		end
 
@@ -53,19 +53,13 @@ function Interpreter:process(text, context)
 		local tag_name = is_closing and tag_content:sub(2) or tag_content
 
 		if not tag_name:match("^[%a%d_]+$") then
-			pos = tag_start + 1
+			pos = tag_start
 			goto continue
 		end
 
 		if not self.tag_handlers[tag_name] then
-			pos = tag_start + 1
+			pos = tag_start
 			goto continue
-		end
-
-		if vim.g.schadenfreude_debug then
-			vim.schedule(function()
-				print("Tag found: " .. (is_closing and "closing " or "opening ") .. tag_name)
-			end)
 		end
 
 		local handler = self.tag_handlers[tag_name]
