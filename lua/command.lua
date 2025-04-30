@@ -11,6 +11,10 @@ function CommandHandler:new()
 end
 
 function CommandHandler:handle(prompt)
+	if type(prompt) ~= "string" then
+		error("Expected string for prompt, got " .. type(prompt))
+	end
+
 	if self:_has_commands_references(prompt) then
 		for _, file_handler in pairs(self.handlers) do
 			prompt = file_handler:handle(prompt)
@@ -21,6 +25,9 @@ function CommandHandler:handle(prompt)
 end
 
 function CommandHandler:_has_commands_references(prompt)
+	if type(prompt) ~= "string" then
+		return false
+	end
 	return prompt:match("@([^%s]+)") ~= nil
 end
 

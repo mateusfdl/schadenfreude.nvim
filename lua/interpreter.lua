@@ -33,30 +33,30 @@ function Interpreter:process(text, context)
 		if not tag_start then
 			break
 		end
-		
+
 		local next_char = result:sub(tag_start + 1, tag_start + 1)
 		local is_valid_tag_start = next_char:match("[%a/]")
-		
+
 		if not is_valid_tag_start then
 			pos = tag_start + 1
 			goto continue
 		end
-		
+
 		tag_end = result:find(">", tag_start)
 		if not tag_end then
 			pos = tag_start + 1
 			goto continue
 		end
-		
+
 		local tag_content = result:sub(tag_start + 1, tag_end - 1)
 		local is_closing = tag_content:sub(1, 1) == "/"
 		local tag_name = is_closing and tag_content:sub(2) or tag_content
-		
+
 		if not tag_name:match("^[%a%d_]+$") then
 			pos = tag_start + 1
 			goto continue
 		end
-		
+
 		if not self.tag_handlers[tag_name] then
 			pos = tag_start + 1
 			goto continue
@@ -103,7 +103,7 @@ function Interpreter:process(text, context)
 				pos = tag_start
 			end
 		end
-		
+
 		::continue::
 	end
 
