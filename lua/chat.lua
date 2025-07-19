@@ -18,7 +18,7 @@ function Chat:new()
 end
 
 function Chat:find_buffer()
-	return vim.fn.bufnr("LLM Chat")
+	return vim.fn.bufnr("LLM")
 end
 
 function Chat:find_window(bufnr)
@@ -41,7 +41,7 @@ function Chat:create_buffer(window_id)
 
 	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
 	vim.api.nvim_buf_set_option(buf, "conceallevel", 2)
-	vim.api.nvim_buf_set_name(buf, "LLM Chat")
+	vim.api.nvim_buf_set_name(buf, "LLM")
 	self.buffer = buf
 	return buf
 end
