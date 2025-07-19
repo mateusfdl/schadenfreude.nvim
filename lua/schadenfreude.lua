@@ -1,6 +1,5 @@
 local Chat = require("chat")
 local LLM = require("llm")
-local Code = require("code")
 local Command = require("command")
 local Utils = require("utils")
 
@@ -47,7 +46,6 @@ function M.setup(configs)
 		error("No LLM providers configured")
 	end
 
-	code_instance = Code:new(current_llm)
 	chat_instance = Chat:new()
 end
 
@@ -97,7 +95,6 @@ function M.switch_model(name)
 	for _, llm in ipairs(M.llms) do
 		if llm.name == name then
 			current_llm = llm.llm
-			code_instance = Code:new(llm.llm)
 			vim.api.nvim_echo({ { "Switched to " .. name, "Comment" } }, true, {})
 			return
 		end
@@ -119,13 +116,6 @@ function M.send_selection_to_chat()
 	local formatted_selection = "```" .. (vim.bo.filetype or "text") .. "\n" .. selection .. "\n```"
 	chat_instance:focus()
 	chat_instance:append_text("\n" .. formatted_selection .. "\n")
-end
-
-function M.refactor_code()
-	if not code_instance then
-		error("Please setup the plugin first with a provider and API key")
-	end
-	code_instance:refactor_code()
 end
 
 return M

@@ -15,7 +15,7 @@ function CommandHandler:handle(prompt)
 		error("Expected string for prompt, got " .. type(prompt))
 	end
 
-	if self:_has_commands_references(prompt) then
+	if self:_has_commands(prompt) then
 		for _, file_handler in pairs(self.handlers) do
 			prompt = file_handler:handle(prompt)
 		end
@@ -24,7 +24,7 @@ function CommandHandler:handle(prompt)
 	return prompt
 end
 
-function CommandHandler:_has_commands_references(prompt)
+function CommandHandler:_has_commands(prompt)
 	if type(prompt) ~= "string" then
 		return false
 	end
