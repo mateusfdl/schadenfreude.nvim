@@ -65,4 +65,14 @@ function Utils.get_prompt(replace)
 	return Utils.get_lines_until_cursor()
 end
 
+function Utils.create_message_id()
+	local names = { "jhonny", "pascal", "haskell", "pneumonia", "rust", "erlang", "ruby", "lisp", "lua" }
+	local name = names[math.random(1, #names)]
+	local uid = ""
+	for _ = 1, 10 do
+		uid = uid .. math.random(0, 9)
+	end
+	return name .. "-" .. uid
+end
+
 return Utils

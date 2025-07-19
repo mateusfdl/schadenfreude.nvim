@@ -1,7 +1,5 @@
 local Job = require("plenary.job")
-
--- Initialize random seed
-math.randomseed(os.time())
+local Utils = require("utils")
 
 local LLM = {}
 LLM.__index = LLM
@@ -61,8 +59,6 @@ function LLM:new(interface, provider, api_key, options)
 		api_key = api_key,
 		interface = interface,
 		options = vim.tbl_deep_extend("force", INTERFACES[interface], options or {}),
-		debug = options and options.debug or false,
-		debug_log_file = options and options.debug_log_file or vim.fn.stdpath("data") .. "/schadenfreude_debug.log",
 	}
 	return setmetatable(instance, self)
 end
@@ -129,13 +125,7 @@ function LLM:generate(prompt, callback)
 	table.insert(args, vim.json.encode(payload))
 	table.insert(args, self.options.url)
 
-	local names = { "jhonny", "pascal", "haskell", "pneumonia", "rust", "erlang", "ruby", "lisp", "lua" }
-	local name = names[math.random(1, #names)]
-	local uid = ""
-	for i = 1, 10 do
-		uid = uid .. math.random(0, 9)
-	end
-	local response_id = name .. "-" .. uid
+	local response_id = Utils.create_message_id()
 	callback("\n@AI :BEGIN == ID:" .. response_id .. "\n")
 	return Job:new({
 		command = "curl",
@@ -161,12 +151,7 @@ function LLM:generate(prompt, callback)
 				end
 			end
 		end,
-		on_stderr = function(err, data)
-			vim.schedule(function()
-				print("Error: " .. vim.inspect(err, data))
-			end)
-		end,
-		on_exit = function(j, return_val)
+		on_exit = function()
 			callback("\n@AI :FINISH\n")
 		end,
 	}):start()

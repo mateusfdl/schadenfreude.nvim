@@ -109,12 +109,13 @@ end
 function M.send_selection_to_chat()
 	local selection = Utils.get_visual_selection()
 	if not selection or selection == "" then
-		vim.api.nvim_echo({ { "No selection found", "Error" } }, true, {})
 		return
 	end
+
 	if not chat_instance then
 		chat_instance = Chat:new()
 	end
+
 	local formatted_selection = "```" .. (vim.bo.filetype or "text") .. "\n" .. selection .. "\n```"
 	chat_instance:focus()
 	chat_instance:append_text("\n" .. formatted_selection .. "\n")
