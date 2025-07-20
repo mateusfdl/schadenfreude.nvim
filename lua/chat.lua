@@ -1,5 +1,6 @@
 local Interpreter = require("interpreter")
 local ThinkHandler = require("tags.handlers.think")
+local Queue = require("queue")
 
 local Chat = {}
 Chat.__index = Chat
@@ -11,9 +12,12 @@ function Chat:new()
 		history = {},
 		current_job = nil,
 		interpreter = Interpreter:new(),
+		queue = Queue:new(),
+		is_typing = false,
 	}
 
 	instance.interpreter:register_handler("think", ThinkHandler:new())
+
 	return setmetatable(instance, self)
 end
 
@@ -94,10 +98,25 @@ function Chat:append_text(text)
 		return
 	end
 
+	self.queue:enqueue(text)
+
+	if not self.is_typing then
+		self:_process_queue()
+	end
+end
+
+function Chat:_process_queue()
 	vim.schedule(function()
-		if not self.buffer then
+		if self.is_typing or not self.buffer or not vim.api.nvim_buf_is_valid(self.buffer) then
 			return
 		end
+
+		local text = self.queue:dequeue()
+		if not text then
+			return
+		end
+
+		self.is_typing = true
 
 		local context = {
 			buffer = self.buffer,
@@ -105,26 +124,53 @@ function Chat:append_text(text)
 		}
 
 		local processed_text = self.interpreter:process(text, context)
-
 		if not processed_text or processed_text == "" then
+			self.is_typing = false
+			self:_process_queue()
 			return
 		end
 
-		local new_lines = vim.split(processed_text, "\n", true)
+		local chars = vim.fn.split(processed_text, "\\zs")
+		local line_idx = vim.api.nvim_buf_line_count(self.buffer) - 1
+		local current_line = vim.api.nvim_buf_get_lines(self.buffer, line_idx, line_idx + 1, false)[1] or ""
+		local char_idx = 1
 
-		local last_line_idx = vim.api.nvim_buf_line_count(self.buffer) - 1
-		local last_line = vim.api.nvim_buf_get_lines(self.buffer, last_line_idx, last_line_idx + 1, false)[1] or ""
+		local function type_char()
+			vim.schedule(function()
+				if not vim.api.nvim_buf_is_valid(self.buffer) then
+					self.is_typing = false
+					return
+				end
 
-		if #new_lines > 0 then
-			new_lines[1] = last_line .. new_lines[1]
+				if char_idx > #chars then
+					self.is_typing = false
+					self:_process_queue()
+					return
+				end
+
+				local char = chars[char_idx]
+
+				if char == "\n" then
+					vim.api.nvim_buf_set_lines(self.buffer, line_idx, line_idx + 1, false, { current_line })
+					current_line = ""
+					line_idx = line_idx + 1
+
+					if line_idx >= vim.api.nvim_buf_line_count(self.buffer) then
+						vim.api.nvim_buf_set_lines(self.buffer, -1, -1, false, { "" })
+					end
+				else
+					current_line = current_line .. char
+					vim.api.nvim_buf_set_lines(self.buffer, line_idx, line_idx + 1, false, { current_line })
+				end
+
+				pcall(vim.api.nvim_win_set_cursor, 0, { line_idx + 1, #current_line })
+
+				char_idx = char_idx + 1
+				vim.defer_fn(type_char, 10)
+			end)
 		end
 
-		vim.api.nvim_buf_set_lines(self.buffer, last_line_idx, last_line_idx + 1, false, new_lines)
-
-		local new_last_line_idx = vim.api.nvim_buf_line_count(self.buffer) - 1
-		local new_last_line = vim.api.nvim_buf_get_lines(self.buffer, new_last_line_idx, new_last_line_idx + 1, false)[1]
-			or ""
-		vim.api.nvim_win_set_cursor(0, { new_last_line_idx + 1, #new_last_line })
+		type_char()
 	end)
 end
 
