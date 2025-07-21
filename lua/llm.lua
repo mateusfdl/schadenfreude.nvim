@@ -1,5 +1,6 @@
 local Job = require("plenary.job")
 local Utils = require("utils")
+local Notification = require("notification")
 
 local LLM = {}
 LLM.__index = LLM
@@ -59,6 +60,7 @@ function LLM:new(interface, provider, api_key, options)
 		api_key = api_key,
 		interface = interface,
 		options = vim.tbl_deep_extend("force", INTERFACES[interface], options or {}),
+    notifier = Notification:new()
 	}
 	return setmetatable(instance, self)
 end
@@ -126,6 +128,7 @@ function LLM:generate(prompt, callback)
 	table.insert(args, self.options.url)
 
 	local response_id = Utils.create_message_id()
+	self.notifier:dispatch_cooking_notification("gemma")
 	callback("\n@AI :BEGIN == ID:" .. response_id .. "\n")
 	return Job:new({
 		command = "curl",
@@ -153,6 +156,7 @@ function LLM:generate(prompt, callback)
 		end,
 		on_exit = function()
 			callback("\n@AI :FINISH\n")
+			self.notifier:stop()
 		end,
 	}):start()
 end
