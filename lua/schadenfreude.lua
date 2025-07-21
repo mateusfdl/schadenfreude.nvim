@@ -6,6 +6,7 @@ local Utils = require("utils")
 local M = {}
 
 local chat_instance = nil
+local queue_instance = nil
 local current_llm = nil
 local active_job = nil
 local command_instance = nil
