@@ -9,31 +9,32 @@ function Notification:new()
 		interval = 500,
 		frame_index = 1,
 		active = false,
+		frames = {},
 	}
 	setmetatable(instance, self)
 	return instance
 end
 
-local frames = {
-	"(╯°□°╯）┻━┻ Gemini is cooking",
-	"(╯'□')╯︵ ┻━┻ Gemini is cooking",
-}
-
-
-function Notification:dispatch_cooking_notification()
+function Notification:dispatch_cooking_notification(model_name)
 	if self.active then
 		return
 	end
-	
+
 	self.active = true
-	
+
+	-- Create dynamic frames with the model name
+	self.frames = {
+		"(╯°□°╯）┻━┻ " .. model_name .. " is cooking",
+		"(╯'□')╯︵ ┻━┻ " .. model_name .. " is cooking",
+	}
+
 	-- Create buffer
 	self.buffer = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_buf_set_option(self.buffer, 'modifiable', false)
-	
+
 	-- Get screen dimensions
 	local ui = vim.api.nvim_list_uis()[1]
-	local max_width = math.max(vim.api.nvim_strwidth(frames[1]), vim.api.nvim_strwidth(frames[2]))
+	local max_width = math.max(vim.api.nvim_strwidth(self.frames[1]), vim.api.nvim_strwidth(self.frames[2]))
 	
 	-- Create window at bottom right, slightly above bottom
 	self.window = vim.api.nvim_open_win(self.buffer, false, {
@@ -57,9 +58,9 @@ function Notification:dispatch_cooking_notification()
 		if not self.active then
 			return
 		end
-		
-		local message = frames[self.frame_index]
-		self.frame_index = (self.frame_index % #frames) + 1
+
+		local message = self.frames[self.frame_index]
+		self.frame_index = (self.frame_index % #self.frames) + 1
 		
 		-- Update buffer content
 		vim.api.nvim_buf_set_option(self.buffer, 'modifiable', true)

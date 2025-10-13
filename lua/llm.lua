@@ -128,7 +128,7 @@ function LLM:generate(prompt, callback)
 	table.insert(args, self.options.url)
 
 	local response_id = Utils.create_message_id()
-	self.notifier:dispatch_cooking_notification("gemma")
+	self.notifier:dispatch_cooking_notification(self.provider)
 	callback("\n@AI :BEGIN == ID:" .. response_id .. "\n")
 	return Job:new({
 		command = "curl",
