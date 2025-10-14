@@ -68,12 +68,12 @@ end
 function LLM:_prepare_payload(prompt)
 	local messages = {}
 
-	table.insert(messages, {
-		role = "user",
-		content = prompt,
-	})
-
 	if self.interface == "anthropic" then
+		table.insert(messages, {
+			role = "user",
+			content = prompt,
+		})
+
 		return {
 			model = self.options.model,
 			messages = messages,
@@ -86,6 +86,10 @@ function LLM:_prepare_payload(prompt)
 		table.insert(messages, {
 			role = "system",
 			content = self.options.system_message_context,
+		})
+		table.insert(messages, {
+			role = "user",
+			content = prompt,
 		})
 
 		return {
@@ -159,18 +163,6 @@ function LLM:generate(prompt, callback)
 			self.notifier:stop()
 		end,
 	}):start()
-end
-
-function LLM:clone()
-	local cloned_options = vim.tbl_deep_extend("force", {}, self.options)
-	cloned_options.debug = self.debug
-	cloned_options.debug_log_file = self.debug_log_file
-
-	return LLM:new(self.interface, self.provider, self.api_key, cloned_options)
-end
-
-function LLM:set_new_context(context)
-	self.options.system_message_context = context
 end
 
 return LLM

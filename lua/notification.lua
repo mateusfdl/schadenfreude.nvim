@@ -30,7 +30,7 @@ function Notification:dispatch_cooking_notification(model_name)
 
 	-- Create buffer
 	self.buffer = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_buf_set_option(self.buffer, 'modifiable', false)
+	vim.bo[self.buffer].modifiable = false
 
 	-- Get screen dimensions
 	local ui = vim.api.nvim_list_uis()[1]
@@ -48,9 +48,9 @@ function Notification:dispatch_cooking_notification(model_name)
 		border = 'none',
 		focusable = false,
 	})
-	
+
 	-- Set window highlight
-	vim.api.nvim_win_set_option(self.window, 'winhl', 'Normal:Normal')
+	vim.wo[self.window].winhl = 'Normal:Normal'
 	
 	-- Start animation timer
 	self.timer = vim.loop.new_timer()
@@ -61,11 +61,11 @@ function Notification:dispatch_cooking_notification(model_name)
 
 		local message = self.frames[self.frame_index]
 		self.frame_index = (self.frame_index % #self.frames) + 1
-		
+
 		-- Update buffer content
-		vim.api.nvim_buf_set_option(self.buffer, 'modifiable', true)
+		vim.bo[self.buffer].modifiable = true
 		vim.api.nvim_buf_set_lines(self.buffer, 0, -1, false, { message })
-		vim.api.nvim_buf_set_option(self.buffer, 'modifiable', false)
+		vim.bo[self.buffer].modifiable = false
 	end))
 end
 

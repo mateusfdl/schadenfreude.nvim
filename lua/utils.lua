@@ -59,20 +59,20 @@ function Utils.get_prompt(replace)
 		if not replace then
 			vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", false, true, true), "nx", false)
 		end
-		return table.concat(vim.split(visual_lines, "\n"), "\n")
+		return visual_lines
 	end
 
 	return Utils.get_lines_until_cursor()
 end
 
 function Utils.create_message_id()
-	local names = { "jhonny", "pascal", "haskell", "pneumonia", "rust", "erlang", "ruby", "lisp", "lua" }
-	local name = names[math.random(1, #names)]
-	local uid = ""
-	for _ = 1, 10 do
-		uid = uid .. math.random(0, 9)
+	local chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	local id = ""
+	for _ = 1, 16 do
+		local idx = math.random(1, #chars)
+		id = id .. chars:sub(idx, idx)
 	end
-	return name .. "-" .. uid
+	return id
 end
 
 return Utils

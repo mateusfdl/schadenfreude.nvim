@@ -3,9 +3,6 @@ ThinkHandler.__index = ThinkHandler
 
 function ThinkHandler:new()
 	local instance = {
-		thinking_indicator = "🌕",
-		completion_indicator = "🌑",
-		indicators = {},
 		timer = nil,
 		frame = 1,
 		frames = {
@@ -28,7 +25,8 @@ function ThinkHandler:on_tag_start(context)
 	context.buffer = vim.api.nvim_get_current_buf()
 
 	local line = vim.api.nvim_buf_get_lines(context.buffer, row - 1, row, false)[1] or ""
-	local new_line = line:sub(1, col) .. self.thinking_indicator
+	local indicator = self.frames[1]
+	local new_line = line:sub(1, col) .. indicator
 
 	if vim.api.nvim_buf_is_valid(context.buffer) then
 		vim.api.nvim_buf_set_lines(context.buffer, row - 1, row, false, { new_line })
@@ -45,7 +43,7 @@ function ThinkHandler:on_tag_start(context)
 		)
 	end
 
-	return self.thinking_indicator
+	return indicator
 end
 
 function ThinkHandler:on_content(_, _)
@@ -56,7 +54,8 @@ function ThinkHandler:on_tag_end(_, context)
 	if context._think_pos and context.buffer and vim.api.nvim_buf_is_valid(context.buffer) then
 		local row, col = unpack(context._think_pos)
 		local line = vim.api.nvim_buf_get_lines(context.buffer, row, row + 1, false)[1] or ""
-		local new_line = line:sub(1, col) .. self.completion_indicator
+		local completion_indicator = "🌑"
+		local new_line = line:sub(1, col) .. completion_indicator
 
 		vim.api.nvim_buf_set_lines(context.buffer, row, row + 1, false, { new_line })
 	end

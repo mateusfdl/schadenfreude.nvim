@@ -16,7 +16,6 @@ function Queue:enqueue(text)
 		return
 	end
 
-	self.buffer = self.buffer or {}
 	table.insert(self.buffer, text)
 end
 
@@ -31,16 +30,6 @@ end
 
 function Queue:is_filled()
 	return #self.buffer > 0
-end
-
-function Queue:process_until_empty(callback)
-	while self:is_filled() do
-		local text = self:dequeue()
-		if not text then
-			break
-		end
-		callback(text)
-	end
 end
 
 return Queue

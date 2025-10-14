@@ -9,8 +9,6 @@ function Chat:new()
 	local instance = {
 		buffer = nil,
 		window = nil,
-		history = {},
-		current_job = nil,
 		interpreter = Interpreter:new(),
 		queue = Queue:new(),
 		is_typing = false,
@@ -39,12 +37,10 @@ function Chat:create_buffer(window_id)
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_win_set_buf(window_id, buf)
 
-	if vim.diagnostic and vim.diagnostic.enable then
-		vim.diagnostic.enable(false, { bufnr = buf })
-	end
+	vim.diagnostic.enable(false, { bufnr = buf })
 
-	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
-	vim.api.nvim_buf_set_option(buf, "conceallevel", 2)
+	vim.bo[buf].filetype = "markdown"
+	vim.bo[buf].conceallevel = 2
 	vim.api.nvim_buf_set_name(buf, "LLM")
 	self.buffer = buf
 	return buf
@@ -56,8 +52,7 @@ function Chat:start()
 	if chat_bufnr == -1 then
 		self.window = vim.api.nvim_get_current_win()
 		local buf = self:create_buffer(self.window)
-		vim.api.nvim_buf_set_option(buf, "syntax", "markdown")
-		vim.api.nvim_command("runtime! syntax/markdown.vim")
+		vim.cmd("runtime! syntax/markdown.vim")
 		return buf
 	else
 		local existing_win = self:find_window(chat_bufnr)

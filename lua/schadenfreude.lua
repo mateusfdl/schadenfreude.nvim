@@ -6,7 +6,6 @@ local Utils = require("utils")
 local M = {}
 
 local chat_instance = nil
-local queue_instance = nil
 local current_llm = nil
 local active_job = nil
 local command_instance = nil
@@ -47,34 +46,24 @@ function M.setup(configs)
 	end
 
 	chat_instance = Chat:new()
+	command_instance = Command:new()
 end
 
 function M.open_chat()
 	if not chat_instance then
-		chat_instance = Chat:new()
-	end
-
-	if not command_instance then
-		command_instance = Command:new()
+		error("Please setup the plugin first")
 	end
 
 	chat_instance:start()
 end
 
 function M.send_message(opts)
-	if not current_llm then
-		error("Please setup the plugin first with a provider and API key")
+	if not current_llm or not chat_instance or not command_instance then
+		error("Please setup the plugin first")
 	end
 
-	if opts.chat then
-		opts.replace = true
-	end
-
-	if not command_instance then
-		command_instance = Command:new()
-	end
-
-	local prompt = command_instance:handle(Utils.get_prompt(opts.replace or false))
+	local replace = opts.chat or opts.replace or false
+	local prompt = command_instance:handle(Utils.get_prompt(replace))
 
 	if opts.chat and vim.api.nvim_get_current_buf() ~= chat_instance.buffer then
 		chat_instance:focus()
@@ -104,13 +93,13 @@ function M.switch_model(name)
 end
 
 function M.send_selection_to_chat()
+	if not chat_instance then
+		error("Please setup the plugin first")
+	end
+
 	local selection = Utils.get_visual_selection()
 	if not selection or selection == "" then
 		return
-	end
-
-	if not chat_instance then
-		chat_instance = Chat:new()
 	end
 
 	local formatted_selection = "```" .. (vim.bo.filetype or "text") .. "\n" .. selection .. "\n```"
