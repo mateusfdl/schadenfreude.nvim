@@ -37,10 +37,12 @@ function Chat:create_buffer(window_id)
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_win_set_buf(window_id, buf)
 
-	vim.diagnostic.enable(false, { bufnr = buf })
+	if vim.diagnostic and vim.diagnostic.disable then
+		vim.diagnostic.disable(buf)
+	end
 
-	vim.bo[buf].filetype = "markdown"
-	vim.bo[buf].conceallevel = 2
+	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
+	vim.api.nvim_win_set_option(window_id, "conceallevel", 2)
 	vim.api.nvim_buf_set_name(buf, "LLM")
 	self.buffer = buf
 	return buf

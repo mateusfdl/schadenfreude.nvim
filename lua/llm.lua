@@ -65,15 +65,26 @@ function LLM:new(interface, provider, api_key, options)
 	return setmetatable(instance, self)
 end
 
-function LLM:_prepare_payload(prompt)
+function LLM:_prepare_payload(prompt, history)
 	local messages = {}
+	
+	-- Add conversation history if provided
+	if history and #history > 0 then
+		for _, msg in ipairs(history) do
+			table.insert(messages, {
+				role = msg.role,
+				content = msg.content,
+			})
+		end
+	end
+
+	-- Add the current user message
+	table.insert(messages, {
+		role = "user",
+		content = prompt,
+	})
 
 	if self.interface == "anthropic" then
-		table.insert(messages, {
-			role = "user",
-			content = prompt,
-		})
-
 		return {
 			model = self.options.model,
 			messages = messages,
@@ -83,13 +94,10 @@ function LLM:_prepare_payload(prompt)
 			stream = true,
 		}
 	else
-		table.insert(messages, {
+		-- For OpenAI, add system message at the beginning
+		table.insert(messages, 1, {
 			role = "system",
 			content = self.options.system_message_context,
-		})
-		table.insert(messages, {
-			role = "user",
-			content = prompt,
 		})
 
 		return {
@@ -121,8 +129,9 @@ function LLM:_prepare_headers()
 	return headers
 end
 
-function LLM:generate(prompt, callback)
-	local payload = self:_prepare_payload(prompt)
+function LLM:generate(prompt, callback, history, options)
+	local opts = options or {}
+	local payload = self:_prepare_payload(prompt, history)
 	local headers = self:_prepare_headers()
 
 	local args = vim.list_extend({ "-N", "-X", "POST" }, headers)
@@ -131,9 +140,14 @@ function LLM:generate(prompt, callback)
 	table.insert(args, vim.json.encode(payload))
 	table.insert(args, self.options.url)
 
-	local response_id = Utils.create_message_id()
 	self.notifier:dispatch_cooking_notification(self.provider)
-	callback("\n@AI :BEGIN == ID:" .. response_id .. "\n")
+	
+	-- Only add markers if not using custom block management
+	if not opts.skip_markers then
+		local response_id = Utils.create_message_id()
+		callback("\n@AI :BEGIN == ID:" .. response_id .. "\n")
+	end
+	
 	return Job:new({
 		command = "curl",
 		args = args,
@@ -159,8 +173,15 @@ function LLM:generate(prompt, callback)
 			end
 		end,
 		on_exit = function()
-			callback("\n@AI :FINISH\n")
+			if not opts.skip_markers then
+				callback("\n@AI :FINISH\n")
+			end
 			self.notifier:stop()
+			
+			-- Call completion callback if provided
+			if opts.on_complete then
+				opts.on_complete()
+			end
 		end,
 	}):start()
 end
