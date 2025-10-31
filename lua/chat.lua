@@ -127,14 +127,18 @@ function Chat:_process_queue()
 			return
 		end
 
-		local chars = vim.fn.split(processed_text, "\\zs")
+		local chars = {}
+		for char in processed_text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			chars[#chars + 1] = char
+		end
+
 		local line_idx = vim.api.nvim_buf_line_count(self.buffer) - 1
 		local current_line = vim.api.nvim_buf_get_lines(self.buffer, line_idx, line_idx + 1, false)[1] or ""
 		local char_idx = 1
 
 		local function type_char()
 			vim.schedule(function()
-				if not vim.api.nvim_buf_is_valid(self.buffer) then
+				if not self.buffer or not vim.api.nvim_buf_is_valid(self.buffer) or not self.window or not vim.api.nvim_win_is_valid(self.window) then
 					self.is_typing = false
 					return
 				end
@@ -160,10 +164,18 @@ function Chat:_process_queue()
 					vim.api.nvim_buf_set_lines(self.buffer, line_idx, line_idx + 1, false, { current_line })
 				end
 
-				pcall(vim.api.nvim_win_set_cursor, 0, { line_idx + 1, #current_line })
+				if self.window and vim.api.nvim_win_is_valid(self.window) then
+					pcall(vim.api.nvim_win_set_cursor, self.window, { line_idx + 1, #current_line })
+				end
 
 				char_idx = char_idx + 1
-				vim.defer_fn(type_char, 10)
+				
+				if char_idx <= #chars then
+					vim.defer_fn(type_char, 10)
+				else
+					self.is_typing = false
+					self:_process_queue()
+				end
 			end)
 		end
 
