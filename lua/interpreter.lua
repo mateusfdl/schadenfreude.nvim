@@ -4,8 +4,8 @@ Interpreter.__index = Interpreter
 function Interpreter:new()
 	local instance = {
 		tag_handlers = {},
-		current_tags = {},
-		buffer = "",
+		active_tag = nil,
+		pending = "",
 	}
 	return setmetatable(instance, self)
 end
@@ -14,110 +14,120 @@ function Interpreter:register_handler(tag_name, handler)
 	self.tag_handlers[tag_name] = handler
 end
 
+local function append_to_tag(tag_state, chunk, context)
+	if not tag_state then
+		return
+	end
+
+	tag_state.buffer = tag_state.buffer .. chunk
+	local handler = tag_state.handler
+	if handler.on_content then
+		handler:on_content(chunk, context)
+	end
+end
+
 function Interpreter:process(text, context)
-	if text == nil or text == "" then
-		return text
+	if not text or text == "" then
+		return ""
 	end
 
-	local result = text
+	local data = self.pending .. text
+	self.pending = ""
+
+	local output = {}
 	local pos = 1
-	local tag_start, tag_end
 
-	if self.buffer ~= "" then
-		result = self.buffer .. result
-		self.buffer = ""
-	end
-
-	while pos <= #result do
-		tag_start = result:find("<", pos)
+	while pos <= #data do
+		local tag_start = data:find("<", pos)
 		if not tag_start then
+			local remainder = data:sub(pos)
+			if remainder ~= "" then
+				if self.active_tag then
+					append_to_tag(self.active_tag, remainder, context)
+				else
+					table.insert(output, remainder)
+				end
+			end
 			break
 		end
 
-		local next_char = result:sub(tag_start + 1, tag_start + 1)
-		local is_valid_tag_start = next_char:match("[%a/]")
-
-		if not is_valid_tag_start then
-			pos = tag_start
-			goto continue
+		if tag_start > pos then
+			local prefix = data:sub(pos, tag_start - 1)
+			if self.active_tag then
+				append_to_tag(self.active_tag, prefix, context)
+			else
+				table.insert(output, prefix)
+			end
 		end
 
-		tag_end = result:find(">", tag_start)
+		local tag_end = data:find(">", tag_start + 1)
 		if not tag_end then
-			pos = tag_start
-			goto continue
+			self.pending = data:sub(tag_start)
+			break
 		end
 
-		local tag_content = result:sub(tag_start + 1, tag_end - 1)
+		local tag_content = data:sub(tag_start + 1, tag_end - 1)
 		local is_closing = tag_content:sub(1, 1) == "/"
 		local tag_name = is_closing and tag_content:sub(2) or tag_content
 
-		if not tag_name:match("^[%a%d_]+$") then
-			pos = tag_start
-			goto continue
-		end
-
-		if not self.tag_handlers[tag_name] then
-			pos = tag_start
+		if not tag_name:match("^[%w_]+$") then
+			local literal = data:sub(tag_start, tag_end)
+			if self.active_tag then
+				append_to_tag(self.active_tag, literal, context)
+			else
+				table.insert(output, literal)
+			end
+			pos = tag_end + 1
 			goto continue
 		end
 
 		local handler = self.tag_handlers[tag_name]
+		if not handler then
+			local literal = data:sub(tag_start, tag_end)
+			if self.active_tag then
+				append_to_tag(self.active_tag, literal, context)
+			else
+				table.insert(output, literal)
+			end
+			pos = tag_end + 1
+			goto continue
+		end
 
 		if is_closing then
-			if #self.current_tags > 0 and self.current_tags[#self.current_tags].name == tag_name then
-				local tag_info = table.remove(self.current_tags)
-				local content = result:sub(tag_info.content_start, tag_start - 1)
-
-				local replacement = handler:on_tag_end(content, context)
-
-				local prefix = result:sub(1, tag_info.start - 1)
-				local suffix = result:sub(tag_end + 1)
-
-				result = prefix .. (replacement or "") .. suffix
-				pos = #prefix + (replacement and #replacement or 0) + 1
-			else
-				result = result:sub(1, tag_start - 1) .. result:sub(tag_end + 1)
-				pos = tag_start
+			if self.active_tag and self.active_tag.name == tag_name then
+				local replacement = handler:on_tag_end(self.active_tag.buffer, context)
+				if replacement and replacement ~= "" then
+					table.insert(output, replacement)
+				end
+				self.active_tag = nil
 			end
 		else
-			table.insert(self.current_tags, {
-				name = tag_name,
-				start = tag_start,
-				content_start = tag_end + 1,
-			})
-
 			local replacement = handler:on_tag_start(context)
-
-			if replacement then
-				result = result:sub(1, tag_start - 1) .. replacement .. result:sub(tag_end + 1)
-				pos = tag_start + #replacement
-			else
-				result = result:sub(1, tag_start - 1) .. result:sub(tag_end + 1)
-				pos = tag_start
+			if replacement and replacement ~= "" then
+				table.insert(output, replacement)
 			end
+			self.active_tag = {
+				name = tag_name,
+				handler = handler,
+				buffer = "",
+			}
 		end
+
+		pos = tag_end + 1
 
 		::continue::
 	end
 
-	if #self.current_tags > 0 then
-		local active_tag = self.current_tags[#self.current_tags]
-		local handler = self.tag_handlers[active_tag.name]
-
-		if handler and handler.on_content then
-			return handler:on_content(result, context) or ""
-		else
-			return ""
-		end
+	if self.active_tag then
+		return table.concat(output)
 	end
 
-	return result
+	return table.concat(output)
 end
 
 function Interpreter:reset()
-	self.current_tags = {}
-	self.buffer = ""
+	self.active_tag = nil
+	self.pending = ""
 end
 
 return Interpreter

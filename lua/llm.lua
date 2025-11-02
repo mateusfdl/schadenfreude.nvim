@@ -41,6 +41,7 @@ Constraints:
 
 REMEMBER, FOLLOW THOSE RULES STRICTLY, IF NOT, YOU WILL BE CHARGED WITH 2 THOUSAND DOLLARS FOR EACH BROKEN RULE
 ]]
+
 local INTERFACES = {
 	anthropic = {
 		system_message_context = DEFAULT_CONTEXT,
@@ -50,64 +51,69 @@ local INTERFACES = {
 	},
 }
 
-function LLM:new(interface, provider, api_key, options)
+local function build_options(interface, options)
 	if not INTERFACES[interface] then
 		error("Unsupported interface: " .. interface)
 	end
 
+	local merged = vim.tbl_deep_extend("force", INTERFACES[interface], options or {})
+
+	if not merged.model then
+		error("Missing model for interface: " .. interface)
+	end
+
+	if not merged.url then
+		error("Missing url for interface: " .. interface)
+	end
+
+	return merged
+end
+
+function LLM:new(interface, provider, api_key, options)
 	local instance = {
 		provider = provider,
 		api_key = api_key,
 		interface = interface,
-		options = vim.tbl_deep_extend("force", INTERFACES[interface], options or {}),
-    notifier = Notification:new()
+		options = build_options(interface, options),
+		notifier = Notification:new(),
 	}
+
 	return setmetatable(instance, self)
 end
 
-function LLM:_prepare_payload(prompt, history)
-	local messages = {}
-	
-	-- Add conversation history if provided
-	if history and #history > 0 then
-		for _, msg in ipairs(history) do
-			table.insert(messages, {
-				role = msg.role,
-				content = msg.content,
-			})
-		end
-	end
-
-	-- Add the current user message
-	table.insert(messages, {
-		role = "user",
-		content = prompt,
-	})
-
+function LLM:_prepare_payload(prompt)
 	if self.interface == "anthropic" then
 		return {
 			model = self.options.model,
-			messages = messages,
+			messages = {
+				{
+					role = "user",
+					content = prompt,
+				},
+			},
 			system = self.options.system_message_context,
-			max_tokens = 101000,
-			temperature = 0.6,
-			stream = true,
-		}
-	else
-		-- For OpenAI, add system message at the beginning
-		table.insert(messages, 1, {
-			role = "system",
-			content = self.options.system_message_context,
-		})
-
-		return {
-			model = self.options.model,
-			messages = messages,
-			max_tokens = 101000,
-			temperature = 0.6,
+			max_tokens = self.options.max_tokens or 101000,
+			temperature = self.options.temperature or 0.6,
 			stream = true,
 		}
 	end
+
+	return {
+		model = self.options.model,
+		messages = {
+			{
+				role = "system",
+				content = self.options.system_message_context,
+			},
+			{
+				role = "user",
+				content = prompt,
+			},
+		},
+		max_tokens = self.options.max_tokens or 101000,
+		temperature = self.options.temperature or 0.6,
+		stream = true,
+	}
 end
 
 function LLM:_prepare_headers()
@@ -129,61 +135,76 @@ function LLM:_prepare_headers()
 	return headers
 end
 
-function LLM:generate(prompt, callback, history, options)
-	local opts = options or {}
-	local payload = self:_prepare_payload(prompt, history)
+function LLM:_handle_stdout(data, callback)
+	local filtered = data:match("^data: (.+)$")
+	if not filtered or filtered == "[DONE]" then
+		return
+	end
+
+	local ok, response = pcall(vim.json.decode, filtered)
+	if not ok then
+		return
+	end
+
+	if self.interface == "anthropic" then
+		local delta = response.delta
+		if delta and delta.text then
+			callback(delta.text)
+		end
+		return
+	end
+
+	local choices = response.choices
+	local choice = choices and choices[1]
+	local delta = choice and choice.delta
+	if delta and delta.content then
+		callback(delta.content)
+	end
+end
+
+function LLM:generate(prompt, callback, on_complete)
+	if not prompt or prompt == "" then
+		return
+	end
+
+	local payload = self:_prepare_payload(prompt)
 	local headers = self:_prepare_headers()
 
-	local args = vim.list_extend({ "-N", "-X", "POST" }, headers)
-
+	local args = { "-sS", "-N", "-X", "POST" }
+	vim.list_extend(args, headers)
 	table.insert(args, "-d")
 	table.insert(args, vim.json.encode(payload))
 	table.insert(args, self.options.url)
 
 	self.notifier:dispatch_cooking_notification(self.provider)
-	
-	-- Only add markers if not using custom block management
-	if not opts.skip_markers then
-		local response_id = Utils.create_message_id()
-		callback("\n@AI :BEGIN == ID:" .. response_id .. "\n")
-	end
-	
-	return Job:new({
+	callback("\n@AI :BEGIN == ID:" .. response_id .. "\n")
+
+	local job = Job:new({
 		command = "curl",
 		args = args,
+		env = self.options.env,
 		on_stdout = function(_, data)
-			local filtered_data = data:match("^data: (.+)$")
-			if not filtered_data then
-				return
-			end
-
-			local success, response = pcall(vim.json.decode, filtered_data)
-			if not success then
-				return
-			end
-
-			if self.interface == "anthropic" then
-				if response.delta and response.delta.text then
-					callback(response.delta.text)
-				end
-			else
-				if response.choices and response.choices[1] and response.choices[1].delta.content then
-					callback(response.choices[1].delta.content)
-				end
+			self:_handle_stdout(data, callback)
+		end,
+		on_stderr = function(_, data)
+			if data and data ~= "" then
+				callback("\n" .. data .. "\n")
 			end
 		end,
-		on_exit = function()
-			if not opts.skip_markers then
-				callback("\n@AI :FINISH\n")
+		on_exit = function(_, code)
+			if code ~= 0 then
+				callback("\nRequest failed with exit code " .. code .. "\n")
 			end
+			callback("\n@AI :FINISH\n")
 			self.notifier:stop()
-			
-			-- Call completion callback if provided
-			if opts.on_complete then
-				opts.on_complete()
+			if on_complete then
+				on_complete(code)
 			end
 		end,
-	}):start()
+	})
+
+	job:start()
+	return job
 end
 
 return LLM

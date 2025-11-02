@@ -1,20 +1,18 @@
 local Interpreter = require("interpreter")
 local ThinkHandler = require("tags.handlers.think")
-local Queue = require("queue")
 
 local Chat = {}
 Chat.__index = Chat
 
 function Chat:new()
+	local interpreter = Interpreter:new()
+	interpreter:register_handler("think", ThinkHandler:new())
+
 	local instance = {
 		buffer = nil,
 		window = nil,
-		interpreter = Interpreter:new(),
-		queue = Queue:new(),
-		is_typing = false,
+		interpreter = interpreter,
 	}
-
-	instance.interpreter:register_handler("think", ThinkHandler:new())
 
 	return setmetatable(instance, self)
 end
@@ -37,150 +35,140 @@ function Chat:create_buffer(window_id)
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_win_set_buf(window_id, buf)
 
-	if vim.diagnostic and vim.diagnostic.disable then
-		vim.diagnostic.disable(buf)
+	vim.diagnostic.enable(false, { bufnr = buf })
+	vim.bo[buf].filetype = "markdown"
+	vim.api.nvim_set_option_value("conceallevel", 2, { win = window_id })
+	vim.api.nvim_buf_set_name(buf, "LLM")
+
+	if vim.api.nvim_buf_line_count(buf) == 0 then
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "" })
 	end
 
-	vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
-	vim.api.nvim_win_set_option(window_id, "conceallevel", 2)
-	vim.api.nvim_buf_set_name(buf, "LLM")
 	self.buffer = buf
+	self.window = window_id
+
 	return buf
 end
 
 function Chat:start()
 	local chat_bufnr = self:find_buffer()
-
-	if chat_bufnr == -1 then
-		self.window = vim.api.nvim_get_current_win()
-		local buf = self:create_buffer(self.window)
+	if chat_bufnr == -1 or not vim.api.nvim_buf_is_valid(chat_bufnr) then
+		local win = vim.api.nvim_get_current_win()
+		local buf = self:create_buffer(win)
 		vim.cmd("runtime! syntax/markdown.vim")
 		return buf
-	else
-		local existing_win = self:find_window(chat_bufnr)
-		if existing_win then
-			vim.api.nvim_set_current_win(existing_win)
-			self.window = existing_win
-			self.buffer = chat_bufnr
-			return chat_bufnr
-		else
-			local current_win = vim.api.nvim_get_current_win()
-			vim.api.nvim_win_set_buf(current_win, chat_bufnr)
-			self.window = current_win
-			self.buffer = chat_bufnr
-			return chat_bufnr
-		end
 	end
+
+	self.buffer = chat_bufnr
+	local existing_win = self:find_window(chat_bufnr)
+	if existing_win then
+		self.window = existing_win
+		vim.api.nvim_set_current_win(existing_win)
+	else
+		local current_win = vim.api.nvim_get_current_win()
+		vim.api.nvim_win_set_buf(current_win, chat_bufnr)
+		self.window = current_win
+	end
+
+	return chat_bufnr
 end
 
 function Chat:focus()
-	local chat_bufnr = self:find_buffer()
+	local bufnr = self.buffer
+	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+		bufnr = self:start()
+	end
 
-	if chat_bufnr == -1 then
-		return self:start()
+	local win = self:find_window(bufnr)
+	if win then
+		vim.api.nvim_set_current_win(win)
+		self.window = win
 	else
-		local chat_win = self:find_window(chat_bufnr)
-		if chat_win then
-			vim.api.nvim_set_current_win(chat_win)
-		else
-			vim.api.nvim_set_current_buf(chat_bufnr)
+		local current_win = vim.api.nvim_get_current_win()
+		vim.api.nvim_win_set_buf(current_win, bufnr)
+		self.window = current_win
+	end
+
+	return bufnr
+end
+
+function Chat:_ensure_buffer()
+	local bufnr = self.buffer
+	if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+		return bufnr
+	end
+
+	return self:start()
+end
+
+function Chat:_append_processed_text(text)
+	if not text or text == "" then
+		return
+	end
+
+	local bufnr = self.buffer
+	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+		return
+	end
+
+	local line_count = vim.api.nvim_buf_line_count(bufnr)
+	if line_count == 0 then
+		vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "" })
+		line_count = 1
+	end
+
+	local last_idx = line_count - 1
+	local current_line = vim.api.nvim_buf_get_lines(bufnr, last_idx, last_idx + 1, false)[1] or ""
+
+	local segments = vim.split(text, "\n", { plain = true })
+	if #segments == 0 then
+		return
+	end
+
+	segments[1] = current_line .. segments[1]
+	vim.api.nvim_buf_set_lines(bufnr, last_idx, last_idx + 1, false, { segments[1] })
+
+	if #segments > 1 then
+		local tail = {}
+		for i = 2, #segments do
+			tail[#tail + 1] = segments[i]
 		end
-		self.buffer = chat_bufnr
-		return chat_bufnr
+		vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, tail)
+	end
+
+	local win = self:find_window(bufnr)
+	if win and vim.api.nvim_win_is_valid(win) then
+		self.window = win
+		local updated_count = vim.api.nvim_buf_line_count(bufnr)
+		local last_line = vim.api.nvim_buf_get_lines(bufnr, updated_count - 1, updated_count, false)[1] or ""
+		pcall(vim.api.nvim_win_set_cursor, win, { updated_count, #last_line })
 	end
 end
 
 function Chat:append_text(text)
-	if not text then
+	if not text or text == "" then
 		return
 	end
 
-	self.queue:enqueue(text)
-
-	if not self.is_typing then
-		self:_process_queue()
+	if vim.in_fast_event() then
+		vim.schedule(function()
+			self:append_text(text)
+		end)
+		return
 	end
-end
 
-function Chat:_process_queue()
-	vim.schedule(function()
-		if self.is_typing or not self.buffer or not vim.api.nvim_buf_is_valid(self.buffer) then
-			return
-		end
+	local bufnr = self:_ensure_buffer()
+	if not bufnr then
+		return
+	end
 
-		local text = self.queue:dequeue()
-		if not text then
-			return
-		end
+	local context = {
+		buffer = bufnr,
+		window = self:find_window(bufnr),
+	}
 
-		self.is_typing = true
-
-		local context = {
-			buffer = self.buffer,
-			window = self.window,
-		}
-
-		local processed_text = self.interpreter:process(text, context)
-		if not processed_text or processed_text == "" then
-			self.is_typing = false
-			self:_process_queue()
-			return
-		end
-
-		local chars = {}
-		for char in processed_text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-			chars[#chars + 1] = char
-		end
-
-		local line_idx = vim.api.nvim_buf_line_count(self.buffer) - 1
-		local current_line = vim.api.nvim_buf_get_lines(self.buffer, line_idx, line_idx + 1, false)[1] or ""
-		local char_idx = 1
-
-		local function type_char()
-			vim.schedule(function()
-				if not self.buffer or not vim.api.nvim_buf_is_valid(self.buffer) or not self.window or not vim.api.nvim_win_is_valid(self.window) then
-					self.is_typing = false
-					return
-				end
-
-				if char_idx > #chars then
-					self.is_typing = false
-					self:_process_queue()
-					return
-				end
-
-				local char = chars[char_idx]
-
-				if char == "\n" then
-					vim.api.nvim_buf_set_lines(self.buffer, line_idx, line_idx + 1, false, { current_line })
-					current_line = ""
-					line_idx = line_idx + 1
-
-					if line_idx >= vim.api.nvim_buf_line_count(self.buffer) then
-						vim.api.nvim_buf_set_lines(self.buffer, -1, -1, false, { "" })
-					end
-				else
-					current_line = current_line .. char
-					vim.api.nvim_buf_set_lines(self.buffer, line_idx, line_idx + 1, false, { current_line })
-				end
-
-				if self.window and vim.api.nvim_win_is_valid(self.window) then
-					pcall(vim.api.nvim_win_set_cursor, self.window, { line_idx + 1, #current_line })
-				end
-
-				char_idx = char_idx + 1
-				
-				if char_idx <= #chars then
-					vim.defer_fn(type_char, 10)
-				else
-					self.is_typing = false
-					self:_process_queue()
-				end
-			end)
-		end
-
-		type_char()
-	end)
+	local processed = self.interpreter:process(text, context)
+	self:_append_processed_text(processed)
 end
 
 return Chat
