@@ -2,8 +2,6 @@ local Chat = require("chat")
 local LLM = require("llm")
 local Command = require("command")
 local Utils = require("utils")
-local BufferParser = require("buffer_parser")
-local ModelBlockManager = require("model_block_manager")
 
 local M = {}
 
@@ -163,21 +161,18 @@ function M.send_selection_to_chat()
 end
 
 function M.stop_all_jobs()
-	-- Stop single model job
 	if active_job then
 		active_job:shutdown()
 		active_job = nil
 	end
-	
-	-- Stop all concurrent model jobs
+
 	for job_id, job in pairs(active_jobs) do
 		if job and job.shutdown then
 			job:shutdown()
 		end
 	end
 	active_jobs = {}
-	
-	-- Clean up completed blocks
+
 	if block_manager then
 		block_manager:cleanup_completed_blocks()
 	end

@@ -38,10 +38,9 @@ function CommandHandler:_has_commands(prompt)
 	if type(prompt) ~= "string" then
 		return false
 	end
-	-- Check for file commands (but exclude model commands)
+
 	local has_file_commands = false
 	for match in prompt:gmatch("@([^%s]+)") do
-		-- Only consider it a file command if it's not a model command
 		if not match:match("^model:") then
 			has_file_commands = true
 			break

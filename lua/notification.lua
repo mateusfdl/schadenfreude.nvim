@@ -1,10 +1,6 @@
 local Notification = {}
 Notification.__index = Notification
 
--- Global registry to track all active notifications
-local active_notifications = {}
-local notification_counter = 0
-
 function Notification:new()
 	local instance = {
 		timer = nil,
