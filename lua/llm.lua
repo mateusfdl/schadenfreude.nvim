@@ -167,6 +167,7 @@ function LLM:generate(prompt, callback, on_complete)
 		return
 	end
 
+	local response_id = tostring(os.time())
 	local payload = self:_prepare_payload(prompt)
 	local headers = self:_prepare_headers()
 

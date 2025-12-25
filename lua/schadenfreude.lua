@@ -31,21 +31,7 @@ local function ensure_setup()
 end
 
 local function collect_providers(configs)
-	if type(configs.providers) == "table" then
-		return configs.providers
-	end
-
-	if vim.tbl_islist(configs) then
-		return configs
-	end
-
-	local providers = {}
-	for _, value in pairs(configs) do
-		if type(value) == "table" and value.provider then
-			table.insert(providers, value)
-		end
-	end
-	return providers
+	return configs.models
 end
 
 local function build_llm_entry(config)
