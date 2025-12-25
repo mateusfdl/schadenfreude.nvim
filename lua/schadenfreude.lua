@@ -30,21 +30,9 @@ local function ensure_setup()
 	end
 end
 
-local function collect_providers(configs)
-	return configs.models
-end
-
 local function build_llm_entry(config)
-	if type(config) ~= "table" then
-		error("LLM config must be a table")
-	end
-
-	if not config.provider or not config.api_key then
-		error("Provider and API key are required for each config")
-	end
-
-	if not config.interface then
-		error("Interface is required for each config, please specify either 'openai' or 'anthropic'")
+	if not config.provider or not config.api_key or not config.interface then
+		error("Provider, API key, and interface are required")
 	end
 
 	local llm = LLM:new(config.interface, config.provider, config.api_key, config.options)
@@ -52,33 +40,29 @@ local function build_llm_entry(config)
 end
 
 function M.setup(configs)
-	if type(configs) ~= "table" then
-		error("Configs must be a table")
+	if not configs or not configs.models or #configs.models == 0 then
+		error("No LLM providers configured")
 	end
 
 	stop_active_job()
 
-	local providers = collect_providers(configs)
-	if #providers == 0 then
-		error("No LLM providers configured")
+	state.llms = {}
+	for _, conf in ipairs(configs.models) do
+		table.insert(state.llms, build_llm_entry(conf))
 	end
 
-	state.llms = {}
+	local selected = configs.selected_provider
 	state.current_llm = nil
-
-	for _, conf in ipairs(providers) do
-		local entry = build_llm_entry(conf)
-		table.insert(state.llms, entry)
-		if configs.selected_provider and entry.name == configs.selected_provider then
+	for _, entry in ipairs(state.llms) do
+		if selected and entry.name == selected then
 			state.current_llm = entry.llm
+			break
 		end
 	end
 
 	if not state.current_llm then
 		state.current_llm = state.llms[1].llm
-		if not configs.selected_provider then
-			vim.api.nvim_echo({ { "Using " .. state.llms[1].name .. " as default", "Comment" } }, true, {})
-		end
+		vim.notify("Using " .. state.llms[1].name .. " as default")
 	end
 
 	state.chat = Chat:new()
@@ -116,8 +100,8 @@ end
 function M.switch_model(name)
 	ensure_setup()
 
-	if type(name) ~= "string" or name == "" then
-		vim.api.nvim_echo({ { "Model not found", "Error" } }, true, {})
+	if not name or name == "" then
+		vim.notify("Model not found", vim.log.levels.ERROR)
 		return
 	end
 
@@ -125,12 +109,12 @@ function M.switch_model(name)
 		if entry.name == name then
 			stop_active_job()
 			state.current_llm = entry.llm
-			vim.api.nvim_echo({ { "Switched to " .. name, "Comment" } }, true, {})
+			vim.notify("Switched to " .. name)
 			return
 		end
 	end
 
-	vim.api.nvim_echo({ { "Model not found", "Error" } }, true, {})
+	vim.notify("Model not found", vim.log.levels.ERROR)
 end
 
 function M.send_selection_to_chat()
@@ -141,27 +125,13 @@ function M.send_selection_to_chat()
 		return
 	end
 
-	local formatted = "```" .. (vim.bo.filetype or "text") .. "\n" .. selection .. "\n```\n"
+	local formatted = string.format("```%s\n%s\n```\n", vim.bo.filetype or "text", selection)
 	state.chat:focus()
 	state.chat:append_text("\n" .. formatted)
 end
 
 function M.stop_all_jobs()
-	if active_job then
-		active_job:shutdown()
-		active_job = nil
-	end
-
-	for job_id, job in pairs(active_jobs) do
-		if job and job.shutdown then
-			job:shutdown()
-		end
-	end
-	active_jobs = {}
-
-	if block_manager then
-		block_manager:cleanup_completed_blocks()
-	end
+	stop_active_job()
 end
 
 return M

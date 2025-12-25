@@ -65,14 +65,4 @@ function Utils.get_prompt(replace)
 	return Utils.get_lines_until_cursor()
 end
 
-function Utils.create_message_id()
-	local chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-	local id = ""
-	for _ = 1, 16 do
-		local idx = math.random(1, #chars)
-		id = id .. chars:sub(idx, idx)
-	end
-	return id
-end
-
 return Utils
