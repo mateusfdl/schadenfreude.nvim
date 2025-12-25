@@ -90,11 +90,12 @@ function M.send_message(opts)
 	stop_active_job()
 	state.chat:append_text("\n")
 
+	local history = state.chat:get_conversation_history()
 	state.active_job = state.current_llm:generate(prompt, function(content)
 		state.chat:append_text(content)
 	end, function()
 		state.active_job = nil
-	end)
+	end, history)
 end
 
 function M.switch_model(name)

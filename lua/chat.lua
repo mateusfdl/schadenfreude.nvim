@@ -83,6 +83,42 @@ function Chat:_ensure_buffer()
 	return self.buffer and vim.api.nvim_buf_is_valid(self.buffer) and self.buffer or self:_get_or_create_buffer()
 end
 
+function Chat:get_conversation_history()
+	if not self.buffer or not vim.api.nvim_buf_is_valid(self.buffer) then
+		return {}
+	end
+
+	local lines = vim.api.nvim_buf_get_lines(self.buffer, 0, -1, false)
+	local content = table.concat(lines, "\n")
+	local messages = {}
+	local current_role = "user"
+	local current_content = ""
+
+	for line in content:gmatch("[^\n]*") do
+		if line:match("^@AI :BEGIN") then
+			if current_content ~= "" then
+				table.insert(messages, { role = current_role, content = vim.trim(current_content) })
+			end
+			current_role = "assistant"
+			current_content = ""
+		elseif line:match("^@AI :FINISH") then
+			if current_content ~= "" then
+				table.insert(messages, { role = current_role, content = vim.trim(current_content) })
+			end
+			current_role = "user"
+			current_content = ""
+		elseif not line:match("^@AI :BEGIN") and not line:match("^@AI :FINISH") then
+			if current_content == "" then
+				current_content = line
+			else
+				current_content = current_content .. "\n" .. line
+			end
+		end
+	end
+
+	return messages
+end
+
 function Chat:_append_processed_text(text)
 	if not text or text == "" or not self.buffer or not vim.api.nvim_buf_is_valid(self.buffer) then
 		return

@@ -54,7 +54,7 @@ function LLM:new(interface, provider, api_key, options)
 	return setmetatable(instance, self)
 end
 
-function LLM:_prepare_payload(prompt)
+function LLM:_prepare_payload(prompt, messages)
 	local base = {
 		model = self.options.model,
 		max_tokens = self.options.max_tokens or 101000,
@@ -62,14 +62,15 @@ function LLM:_prepare_payload(prompt)
 		stream = true,
 	}
 
+	messages = messages or {}
+	table.insert(messages, { role = "user", content = prompt })
+
 	if self.interface == "anthropic" then
-		base.messages = {{ role = "user", content = prompt }}
+		base.messages = messages
 		base.system = self.options.system_message_context
 	else
-		base.messages = {
-			{ role = "system", content = self.options.system_message_context },
-			{ role = "user", content = prompt }
-		}
+		base.messages = { { role = "system", content = self.options.system_message_context } }
+		vim.list_extend(base.messages, messages)
 	end
 
 	return base
@@ -110,13 +111,13 @@ function LLM:_handle_stdout(data, callback)
 	end
 end
 
-function LLM:generate(prompt, callback, on_complete)
+function LLM:generate(prompt, callback, on_complete, messages)
 	if not prompt or prompt == "" then
 		return
 	end
 
 	local response_id = tostring(os.time())
-	local payload = self:_prepare_payload(prompt)
+	local payload = self:_prepare_payload(prompt, messages)
 	local headers = self:_prepare_headers()
 
 	local args = { "-sS", "-N", "-X", "POST" }
